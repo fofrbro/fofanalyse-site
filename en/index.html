@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cheikhou FOFANA · Data Engineer</title>
+  <meta name="description" content="Cheikhou FOFANA, Data Engineer and Analytics Engineer: Microsoft Fabric, Python, SQL. Medallion pipelines, Power BI, AI agents and RAG.">
+  <link rel="canonical" href="https://fofanalyse.com/en/">
+  <link rel="alternate" hreflang="fr" href="https://fofanalyse.com/">
+  <link rel="alternate" hreflang="en" href="https://fofanalyse.com/en/">
+  <meta property="og:type" content="profile">
+  <meta property="og:title" content="Cheikhou FOFANA · Data Engineer">
+  <meta property="og:description" content="I build pipelines that turn raw data into reliable information, ready for decisions.">
+  <meta property="og:url" content="https://fofanalyse.com/en/">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="#top">Cheikhou FOFANA</a>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="#about">About</a>
+        <a href="#projects">Projects</a>
+        <a href="#experience">Experience</a>
+        <a href="#skills">Skills</a>
+        <a href="#contact">Contact</a>
+        <a class="lang" href="../" hreflang="fr" lang="fr">FR</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <div>
+          <h1>Cheikhou FOFANA</h1>
+          <p class="title">Data Engineer · Analytics Engineer — Microsoft Fabric · Python · SQL</p>
+          <p class="tagline">I build pipelines that turn raw data into reliable information, ready for decisions.</p>
+          <p class="status">I am looking for a permanent data engineer or analytics engineer position in the Lille area or in Paris (Île-de-France).</p>
+          <div class="buttons">
+            <a class="button primary" href="https://demo.fofanalyse.com">Try my AI agent</a>
+            <a class="button" href="../cv/CV_Cheikhou_Fofana_Data_Engineer.pdf">Download my CV (in French)</a>
+            <a class="button" href="https://github.com/fofrbro">GitHub</a>
+            <a class="button" href="https://www.linkedin.com/in/cheikhoufofana/">LinkedIn</a>
+          </div>
+        </div>
+        <!-- TO DO: replace with <img class="photo" src="../assets/photo.jpg" alt="Cheikhou FOFANA"> -->
+        <div class="photo photo-placeholder" aria-hidden="true">CF</div>
+      </div>
+    </section>
+
+    <section id="about">
+      <div class="wrap">
+        <h2>About me</h2>
+        <p class="lead">I trained in computer engineering and hold a French level-6 (bachelor's-level) Data Analyst qualification. My first assignment, at Stratton IT in Lille, took me straight into practice: I built an agent that collected information from PostgreSQL servers, exported it to CSV and fed the company's business intelligence tool.</p>
+        <p class="lead">Since 2022, I have also been working on food-industry production lines. There I learned what dashboards do not show: where a piece of data comes from, why two systems do not count the same thing, and what a wrong figure costs on the shop floor.</p>
+        <p class="lead">Today I specialise in the Microsoft Fabric ecosystem and I am preparing the DP-700 certification (Fabric Data Engineer), with the exam scheduled for October 2026. Finance particularly appeals to me: it is a sector where data reliability is not negotiable. I remain open to any environment where data truly matters.</p>
+
+        <h2 style="margin-top: 36px;">What I do</h2>
+        <div class="grid two">
+          <div class="card"><h3>Ingestion and transformation</h3><p>Multi-source pipelines in PySpark and SQL, on Microsoft Fabric.</p></div>
+          <div class="card"><h3>Medallion architecture</h3><p>Bronze, silver and gold layers on Delta Lake, with data quality checks.</p></div>
+          <div class="card"><h3>Analytical modelling</h3><p>Clean, documented tables designed for analysis.</p></div>
+          <div class="card"><h3>Reporting</h3><p>Readable Power BI reports, useful to decision-makers.</p></div>
+          <div class="card"><h3>AI applied to data</h3><p>Agents and RAG in Python to automate and query data.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="projects">
+      <div class="wrap">
+        <h2>Projects</h2>
+        <div class="grid two">
+          <article class="card featured">
+            <p class="meta"><span class="badge">2026</span><span class="badge">Live demo</span>Python · FastAPI · Microsoft Fabric · Power BI · LLM</p>
+            <h3>AI data engineering agent</h3>
+            <p>Drop a file: the agent analyses it and proposes a data contract, a bronze / silver / gold pipeline, KPIs and a dashboard. Nothing runs without human approval; everything is verified and audited.</p>
+            <ul>
+              <li><strong>Governance</strong>: versioned data contract, INGEST / QUARANTINE / REJECT decision for each file, business rules (cancelled orders excluded from KPIs).</li>
+              <li><strong>Controlled AI</strong>: the LLM proposes (column roles, column names for a headerless file, analysis summary), code checks every proposal and every cited figure, and a reviewer decides.</li>
+              <li><strong>Validated in Microsoft Fabric and Power BI</strong>: Delta tables and reports checked against the source files, for example revenue of 20,928,022.43 over 32,718 rows.</li>
+              <li><strong>Rigour</strong>: more than 480 automated tests, run on every change.</li>
+            </ul>
+            <p class="meta">The demo interface and the code documentation are in French.</p>
+            <div class="buttons">
+              <a class="button primary" href="https://demo.fofanalyse.com">Try the demo</a>
+              <a class="button" href="https://github.com/fofrbro/data-engineering-agent">See the code</a>
+            </div>
+          </article>
+
+          <article class="card">
+            <p class="meta"><span class="badge">2026</span>Microsoft Fabric · PySpark · Delta Lake · Power BI</p>
+            <h3>End-to-end data pipeline on Microsoft Fabric</h3>
+            <ul>
+              <li>Multi-source ingestion and PySpark transformation, stored as Delta tables.</li>
+              <li>Bronze / silver / gold medallion architecture in a Lakehouse, delivered in a Power BI report.</li>
+            </ul>
+          </article>
+
+          <!-- TO DO: detailed description and demo link of the RAG (rag.fofanalyse.com). -->
+          <article class="card todo">
+            <p class="meta"><span class="badge">2026</span>Python · PostgreSQL · pgvector · Linux</p>
+            <h3>RAG on PostgreSQL + pgvector</h3>
+            <ul>
+              <li>Question answering over documents: chunking, embeddings, vector search in PostgreSQL.</li>
+            </ul>
+            <p class="meta">Demo coming soon.</p>
+          </article>
+
+          <article class="card">
+            <p class="meta"><span class="badge">OpenClassrooms</span>Python · Machine Learning</p>
+            <h3>Counterfeit banknote detection</h3>
+            <ul>
+              <li>Data preparation and a classification model in Python.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="experience">
+      <div class="wrap">
+        <h2>Experience and education</h2>
+        <ol class="timeline">
+          <li>
+            <span class="when">Exam in October 2026</span>
+            <h3>Microsoft Certified: Fabric Data Engineer Associate (DP-700)</h3>
+            <p>In preparation.</p>
+          </li>
+          <li>
+            <span class="when">July 2022 – present · Tourcoing, France</span>
+            <h3>Production operator — Manpower, assigned to Confiserie du Nord (Sucralliance group)</h3>
+            <p>Food-industry line operation, production KPI monitoring, quality control and traceability. Alongside: specialising in data engineering on Microsoft Fabric.</p>
+          </li>
+          <li>
+            <span class="when">January 2021 – March 2022</span>
+            <h3>Data Analyst — professional projects, OpenClassrooms (French level-6 qualification)</h3>
+            <p>Data preparation and analysis in Python, PostgreSQL querying and administration, Power BI and Tableau reports, predictive models.</p>
+          </li>
+          <li>
+            <span class="when">July – October 2016 · Lille, France</span>
+            <h3>Database administrator (DBA) — Stratton IT</h3>
+            <p>Agent collecting information from PostgreSQL servers, CSV export to the BI tool, monitoring dashboards, performance tuning.</p>
+          </li>
+          <li>
+            <span class="when">2011 – 2013</span>
+            <h3>Two-year degree in computer engineering — Université Dakar-Bourguiba</h3>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="skills">
+      <div class="wrap">
+        <h2>Skills</h2>
+        <dl class="skills">
+          <div><dt>Data Engineering</dt><dd>Microsoft Fabric (Lakehouse, Pipelines, Dataflows Gen2, Notebooks, Eventstream) · PySpark · Delta Lake · medallion architecture · ETL / ELT</dd></div>
+          <div><dt>Analytics Engineering</dt><dd>Dimensional modelling · data quality testing · Power BI (DAX, Direct Lake) · Tableau</dd></div>
+          <div><dt>Languages</dt><dd>Python (Pandas, NumPy) · SQL / T-SQL · KQL · Bash</dd></div>
+          <div><dt>Databases</dt><dd>PostgreSQL (including pgvector) · MySQL · Oracle · MongoDB</dd></div>
+          <div><dt>Cloud and tools</dt><dd>Microsoft Azure · Git · VS Code · Linux (Ubuntu)</dd></div>
+          <div><dt>Applied AI</dt><dd>AI agents in Python · RAG (vector search) · supervised machine learning</dd></div>
+          <div><dt>Spoken languages</dt><dd>French: fluent · English: intermediate</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section id="contact">
+      <div class="wrap">
+        <h2>Contact</h2>
+        <p class="lead">Hiring a data engineer or analytics engineer? Write to me, I reply quickly.</p>
+        <div class="buttons">
+          <a class="button primary" href="mailto:cheikhou@fofanalyse.com">cheikhou@fofanalyse.com</a>
+          <a class="button" href="https://www.linkedin.com/in/cheikhoufofana/">LinkedIn</a>
+          <a class="button" href="https://github.com/fofrbro">GitHub</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">© 2026 Cheikhou FOFANA · This site uses no cookies and no trackers.</div>
+  </footer>
+</body>
+</html>

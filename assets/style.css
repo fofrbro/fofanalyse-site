@@ -1,0 +1,129 @@
+/* fofanalyse.com : site professionnel de Cheikhou FOFANA.
+   Aucune ressource externe : polices système, pas de traceur. */
+
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f4f7fb;
+  --text: #1d2939;
+  --muted: #475467;
+  --accent: #1f4e79;
+  --accent-soft: #e3ecf6;
+  --border: #e4e7ec;
+  --max: 1040px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1722;
+    --bg-soft: #162130;
+    --text: #e6edf5;
+    --muted: #a6b3c3;
+    --accent: #7fb2e5;
+    --accent-soft: #1d3149;
+    --border: #243447;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 17px;
+}
+
+a { color: var(--accent); }
+a:focus-visible, .button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 20px; }
+
+/* En-tête */
+.site-header {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+.site-header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 60px; flex-wrap: wrap; }
+.brand { font-weight: 700; color: var(--text); text-decoration: none; letter-spacing: 0.02em; }
+.nav { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.95rem; }
+.nav a { color: var(--muted); text-decoration: none; }
+.nav a:hover { color: var(--accent); }
+.lang { font-weight: 600; }
+
+/* Accroche */
+.hero { padding: 64px 0 48px; background: linear-gradient(180deg, var(--bg-soft), var(--bg)); }
+.hero .wrap { display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center; }
+.hero h1 { font-size: clamp(2rem, 5vw, 3rem); margin: 0; color: var(--accent); letter-spacing: 0.01em; }
+.hero .title { font-size: 1.15rem; font-weight: 600; margin: 6px 0 16px; }
+.hero .tagline { font-size: 1.2rem; color: var(--muted); font-style: italic; margin: 0 0 24px; max-width: 38em; }
+.hero .status { color: var(--muted); margin: 0 0 24px; }
+.photo {
+  width: 180px; height: 180px; border-radius: 50%;
+  object-fit: cover; border: 4px solid var(--accent-soft);
+}
+.photo-placeholder {
+  display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent);
+  font-size: 3rem; font-weight: 700;
+}
+
+.buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+.button {
+  display: inline-block; padding: 10px 18px; border-radius: 8px;
+  border: 1px solid var(--accent); text-decoration: none; font-weight: 600;
+}
+.button.primary { background: var(--accent); color: var(--bg); }
+.button:hover { filter: brightness(1.08); }
+
+/* Sections */
+section { padding: 48px 0; }
+section + section { border-top: 1px solid var(--border); }
+h2 { font-size: 1.6rem; color: var(--accent); margin: 0 0 20px; }
+h3 { margin: 0 0 6px; font-size: 1.15rem; }
+.lead { font-size: 1.05rem; max-width: 46em; }
+
+.grid { display: grid; gap: 18px; }
+.grid.two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+.card {
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 20px; background: var(--bg);
+}
+.card.featured { border: 2px solid var(--accent); background: var(--bg-soft); grid-column: 1 / -1; }
+.card .meta { color: var(--muted); font-size: 0.9rem; margin: 0 0 10px; }
+.card ul { padding-left: 20px; margin: 10px 0; }
+.card .buttons { margin-top: 14px; }
+.todo { border-style: dashed; }
+.badge {
+  display: inline-block; font-size: 0.8rem; font-weight: 600;
+  background: var(--accent-soft); color: var(--accent);
+  padding: 2px 10px; border-radius: 999px; margin-right: 6px;
+}
+
+.skills { display: grid; gap: 14px; }
+.skills div { display: grid; grid-template-columns: 220px 1fr; gap: 12px; }
+.skills dt { font-weight: 600; }
+.skills dd { margin: 0; color: var(--muted); }
+
+.timeline { list-style: none; padding: 0; margin: 0; }
+.timeline li { padding: 0 0 22px 22px; border-left: 2px solid var(--accent-soft); position: relative; }
+.timeline li::before {
+  content: ""; position: absolute; left: -7px; top: 6px;
+  width: 12px; height: 12px; border-radius: 50%; background: var(--accent);
+}
+.timeline .when { color: var(--muted); font-size: 0.9rem; }
+
+.site-footer { padding: 28px 0; color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--border); }
+
+@media (max-width: 720px) {
+  /* Sur mobile, le menu passe sur deux lignes : il ne reste pas fixé. */
+  .site-header { position: static; }
+  .hero .wrap { grid-template-columns: 1fr; }
+  .photo { width: 130px; height: 130px; order: -1; }
+  .skills div { grid-template-columns: 1fr; gap: 2px; }
+  body { font-size: 16px; }
+}
