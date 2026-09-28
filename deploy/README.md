@@ -26,7 +26,7 @@ Chez le registraire de `fofanalyse.com`, créer (ou modifier) :
 
 | Type | Nom | Valeur |
 |---|---|---|
-| A | `@` (domaine nu) | adresse IPv4 du VPS |
+| A | `@` (domaine nu) | adresse IPv4 du VPS (remplace l'actuelle, 87.98.150.35) |
 | A | `www` | adresse IPv4 du VPS |
 | A | `demo` | adresse IPv4 du VPS |
 
@@ -68,12 +68,14 @@ cd /srv/fofanalyse-site/deploy && nano .env
 ```
 
 ```
-# Formulaire de contact : compte SMTP de la boîte cheikhou@fofanalyse.com
-SMTP_HOST=smtp.fournisseur-de-messagerie.example
+# Formulaire de contact : boîte cheikhou@fofanalyse.com chez Viaduc
+# (Nom-domaine.fr). Utiliser smtp.viaduc.fr et non smtp.fofanalyse.com :
+# le certificat TLS n'est pas valable pour l'alias.
+SMTP_HOST=smtp.viaduc.fr
 SMTP_PORT=465
 SMTP_SECURITY=ssl
 SMTP_USER=cheikhou@fofanalyse.com
-SMTP_PASSWORD=mot-de-passe-d-application
+SMTP_PASSWORD=mot-de-passe-de-la-boite
 CONTACT_FROM=cheikhou@fofanalyse.com
 CONTACT_TO=cheikhou@fofanalyse.com
 
@@ -85,9 +87,12 @@ OPENAI_API_KEY=cle-du-projet-openai-de-la-demo
 chmod 600 .env
 ```
 
-- **SMTP** : utiliser les paramètres de votre fournisseur de messagerie et,
-  s'il en propose, un **mot de passe d'application** plutôt que le mot de
-  passe principal.
+- **SMTP** : vérifié le 2026-09-29, `smtp.viaduc.fr` accepte le port 465
+  (SSL, réglage par défaut) et le port 587 (`SMTP_SECURITY=starttls`), avec
+  authentification. Le SPF de `fofanalyse.com` autorise déjà Viaduc
+  (`include:spf.viaduc.fr`) : les messages ne partent pas en spam. Si votre
+  espace client propose un mot de passe dédié aux applications, préférez-le
+  au mot de passe principal.
 - **OpenAI** : un projet dédié à la démo avec une **limite de dépense
   mensuelle** (par exemple 10 $). Sans clé, la démo fonctionne sans les
   fonctions LLM.

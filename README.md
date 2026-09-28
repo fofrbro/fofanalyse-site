@@ -57,9 +57,6 @@ Vérifier que le PDF tient sur une page.
 
 ## À compléter
 
-- **Photo** : déposer `www/assets/photo.jpg` (carrée, environ 400 × 400 px),
-  puis remplacer l'emplacement « CF » dans les deux pages d'accueil
-  (commentaires « À COMPLÉTER » / « TO DO »).
 - **Projet RAG** : description détaillée et lien de démo
   (`rag.fofanalyse.com`) dans les deux pages d'accueil.
 - **Liens GitHub** : `github.com/fofrbro/data-engineering-agent` répondra
