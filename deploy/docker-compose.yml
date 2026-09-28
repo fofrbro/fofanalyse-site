@@ -1,0 +1,53 @@
+# Pile complète du serveur fofanalyse.com : un seul Caddy (HTTPS automatique)
+# pour le site, le formulaire de contact et la démo de l'agent.
+#
+# Sur le serveur, les deux dépôts sont clonés côte à côte :
+#   /srv/fofanalyse-site         (ce dépôt)
+#   /srv/data-engineering-agent  (l'agent)
+# Lancement, depuis fofanalyse-site/deploy : docker compose up -d --build
+services:
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Seules les pages publiques (www/) sont servies.
+      - ../www:/srv/site:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - contact
+      - agent
+    restart: unless-stopped
+
+  contact:
+    build:
+      context: ../contact-service
+    # Identifiants SMTP dans deploy/.env, jamais dans Git.
+    env_file:
+      - path: .env
+        required: false
+    expose:
+      - "8000"
+    mem_limit: 256m
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: ../../data-engineering-agent
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DEMO_MODE: "true"
+      DEMO_SECURE_COOKIE: "true"
+    expose:
+      - "8000"
+    mem_limit: 1g
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

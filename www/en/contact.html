@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact · Cheikhou FOFANA</title>
+  <meta name="description" content="Contact Cheikhou FOFANA, Data Engineer and Analytics Engineer.">
+  <link rel="canonical" href="https://fofanalyse.com/en/contact.html">
+  <link rel="alternate" hreflang="fr" href="https://fofanalyse.com/contact.html">
+  <link rel="alternate" hreflang="en" href="https://fofanalyse.com/en/contact.html">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="./">Cheikhou FOFANA</a>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="./#about">About</a>
+        <a href="./#projects">Projects</a>
+        <a href="./#experience">Experience</a>
+        <a href="./#skills">Skills</a>
+        <a href="contact.html" aria-current="page">Contact</a>
+        <a class="lang" href="../contact.html" hreflang="fr" lang="fr">FR</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <div class="wrap narrow">
+        <h1 class="page-title">Get in touch</h1>
+        <p class="lead">Hiring a data engineer or analytics engineer, or a question about a project? Leave me a message: it reaches me directly by e-mail and I reply quickly. You may write in English or in French.</p>
+
+        <form class="contact-form" method="post" action="/api/contact">
+          <input type="hidden" name="lang" value="en">
+
+          <label for="name">Full name</label>
+          <input id="name" name="name" type="text" autocomplete="name" required maxlength="100">
+
+          <label for="email">Work e-mail</label>
+          <input id="email" name="email" type="email" autocomplete="email" required maxlength="200">
+
+          <label for="company">Company <span class="optional">(optional)</span></label>
+          <input id="company" name="company" type="text" autocomplete="organization" maxlength="120">
+
+          <label for="message">Message</label>
+          <textarea id="message" name="message" rows="7" required minlength="10" maxlength="5000"></textarea>
+
+          <!-- Honeypot: invisible to people, filled in by bots. -->
+          <div class="hp" aria-hidden="true">
+            <label for="website">Leave empty</label>
+            <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+          </div>
+
+          <p class="privacy">Your details are only used to reply to you. They are sent to me by e-mail and are not stored on this site.</p>
+
+          <button class="button primary" type="submit">Send message</button>
+        </form>
+
+        <p class="alt-contact">Prefer to write directly? <a href="mailto:cheikhou@fofanalyse.com">cheikhou@fofanalyse.com</a> · <a href="https://www.linkedin.com/in/cheikhoufofana/">LinkedIn</a></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">© 2026 Cheikhou FOFANA · This site uses no cookies and no trackers.</div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,54 @@
+# Caddy obtient et renouvelle seul les certificats HTTPS.
+
+(securite) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+fofanalyse.com {
+	import securite
+	encode gzip
+
+	header {
+		# Site sans script ni ressource externe : politique stricte.
+		Content-Security-Policy "default-src 'self'; script-src 'none'; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
+	}
+
+	# Formulaire de contact : petites requêtes seulement.
+	handle /api/contact* {
+		request_body {
+			max_size 32KB
+		}
+		reverse_proxy contact:8000
+	}
+
+	handle {
+		root * /srv/site
+		file_server
+	}
+}
+
+www.fofanalyse.com {
+	redir https://fofanalyse.com{uri} permanent
+}
+
+demo.fofanalyse.com {
+	import securite
+	encode gzip
+
+	header {
+		# La démo peut être intégrée au site fofanalyse.com, pas ailleurs.
+		Content-Security-Policy "frame-ancestors 'self' https://fofanalyse.com"
+	}
+
+	# La démo n'accepte pas d'upload : seules de petites requêtes JSON.
+	request_body {
+		max_size 1MB
+	}
+
+	reverse_proxy agent:8000
+}

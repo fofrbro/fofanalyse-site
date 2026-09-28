@@ -117,6 +117,27 @@ h3 { margin: 0 0 6px; font-size: 1.15rem; }
 }
 .timeline .when { color: var(--muted); font-size: 0.9rem; }
 
+/* Pages secondaires et formulaire de contact */
+.wrap.narrow { max-width: 720px; }
+.page-title { font-size: clamp(1.8rem, 4vw, 2.4rem); color: var(--accent); margin: 0 0 12px; }
+.nav a[aria-current="page"] { color: var(--accent); font-weight: 600; }
+
+.contact-form { display: grid; gap: 6px; margin: 24px 0; }
+.contact-form label { font-weight: 600; margin-top: 10px; }
+.contact-form input,
+.contact-form textarea {
+  width: 100%; padding: 10px 12px; font: inherit; color: var(--text);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+}
+.contact-form input:focus,
+.contact-form textarea:focus { outline: 3px solid var(--accent-soft); border-color: var(--accent); }
+.contact-form button { justify-self: start; margin-top: 8px; cursor: pointer; font: inherit; font-weight: 600; }
+.optional { font-weight: 400; color: var(--muted); }
+.privacy, .alt-contact { color: var(--muted); font-size: 0.92rem; }
+
+/* Champ piège : hors écran pour un humain, présent pour un robot. */
+.hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
 .site-footer { padding: 28px 0; color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--border); }
 
 @media (max-width: 720px) {
@@ -127,3 +148,5 @@ h3 { margin: 0 0 6px; font-size: 1.15rem; }
   .skills div { grid-template-columns: 1fr; gap: 2px; }
   body { font-size: 16px; }
 }
+
+h2.spaced { margin-top: 36px; }
