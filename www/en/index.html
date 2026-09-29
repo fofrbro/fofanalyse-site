@@ -98,14 +98,18 @@
             </ul>
           </article>
 
-          <!-- TO DO: detailed description and demo link of the RAG (rag.fofanalyse.com). -->
-          <article class="card todo">
-            <p class="meta"><span class="badge">2026</span>Python · PostgreSQL · pgvector · Linux</p>
+          <article class="card">
+            <p class="meta"><span class="badge">2026</span>Python · PostgreSQL · pgvector · Cloudflare Workers</p>
             <h3>RAG on PostgreSQL + pgvector</h3>
             <ul>
-              <li>Question answering over documents: chunking, embeddings, vector search in PostgreSQL.</li>
+              <li>Questions about my profile and my DP-700 revision notes: passages chunked and embedded (multilingual-e5-small), stored in PostgreSQL with pgvector.</li>
+              <li>The question is embedded in the browser; PostgreSQL retrieves the 3 closest passages above a relevance threshold.</li>
+              <li>The language model answers only from those passages and cites them; without a relevant passage, it is not called.</li>
             </ul>
-            <p class="meta">Demo coming soon.</p>
+            <div class="buttons">
+              <a class="button primary" href="../rag/">Ask a question</a>
+            </div>
+            <p class="meta">The page is in French; questions in English work too.</p>
           </article>
 
           <article class="card">

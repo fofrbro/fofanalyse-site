@@ -1,0 +1,93 @@
+/* Page « Posez votre question » (RAG), aux couleurs du site.
+   Les variables reprennent celles de assets/style.css (mode sombre compris). */
+
+.rag {
+  --fond: var(--bg-soft);
+  --surface: var(--bg);
+  --encre: var(--text);
+  --texte-doux: var(--muted);
+  --ligne: var(--border);
+  --accent-doux: var(--accent-soft);
+  --seuil: #a66a00;         /* repère du seuil de pertinence */
+  --rayon: 10px;
+  max-width: 46rem; margin: 0 auto; padding: 3rem 1.25rem 4rem;
+}
+@media (prefers-color-scheme: dark) { .rag { --seuil: #e0a53a; } }
+
+.rag h1 { font-size: clamp(1.75rem, 4vw, 2.4rem); color: var(--accent); line-height: 1.15; margin: 0 0 .75rem; }
+.rag .intro { color: var(--texte-doux); margin: 0 0 2rem; max-width: 38rem; }
+
+/* Choix de la source */
+.sources { display: inline-flex; border: 1px solid var(--ligne); border-radius: var(--rayon); padding: 3px; background: var(--surface); margin-bottom: 1rem; flex-wrap: wrap; }
+.sources label { position: relative; cursor: pointer; }
+.sources input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.sources span { display: block; padding: .4rem .9rem; border-radius: 7px; font-size: .92rem; color: var(--texte-doux); }
+.sources input:checked + span { background: var(--accent); color: var(--surface); font-weight: 600; }
+.sources input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Formulaire */
+.rag form { display: flex; gap: .5rem; }
+.rag form input {
+  flex: 1; min-width: 0; font: inherit; color: var(--encre); background: var(--surface);
+  border: 1px solid var(--ligne); border-radius: var(--rayon); padding: .75rem 1rem;
+}
+.rag form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+.rag button { font: inherit; cursor: pointer; }
+.rechercher {
+  background: var(--accent); color: var(--surface); border: 0; border-radius: var(--rayon);
+  padding: .75rem 1.25rem; font-weight: 600;
+}
+.rechercher:disabled { opacity: .6; cursor: progress; }
+.rag button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.suggestions { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+.suggestions button {
+  background: transparent; color: var(--texte-doux); border: 1px dashed var(--ligne);
+  border-radius: 999px; padding: .3rem .8rem; font-size: .88rem;
+}
+.suggestions button:hover { color: var(--accent); border-color: var(--accent); }
+
+.etat { min-height: 1.5rem; margin: 1.5rem 0 .5rem; color: var(--texte-doux); font-size: .92rem; }
+.etat.erreur { color: var(--seuil); }
+
+/* Réponse rédigée par le LLM */
+.reponse { background: var(--surface); border: 1px solid var(--ligne); border-left: 4px solid var(--accent); border-radius: var(--rayon); padding: 1.1rem 1.25rem; margin-bottom: 1.5rem; }
+.reponse h2 { font-size: 1rem; margin: 0 0 .5rem; color: var(--encre); }
+.reponse p { margin: 0 0 .6rem; }
+.reponse p:last-child { margin-bottom: 0; }
+.reponse .attente { color: var(--texte-doux); }
+.reponse .note { color: var(--texte-doux); font-size: .85rem; margin-top: .75rem; }
+.extraits-titre { font-size: .95rem; margin: 0 0 .75rem; color: var(--texte-doux); }
+
+/* Résultats */
+.resultats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+.resultat { min-width: 0; background: var(--surface); border: 1px solid var(--ligne); border-radius: var(--rayon); padding: 1.25rem 1.25rem 1rem; }
+.resultat h2 { font-size: 1.05rem; margin: .15rem 0 .9rem; color: var(--encre); }
+.source { font-size: .82rem; color: var(--accent); font-weight: 600; }
+
+/* La jauge : score de similarité et seuil en dessous duquel un passage est écarté. */
+.mesure { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+.jauge { position: relative; flex: 1; height: 8px; border-radius: 4px; background: var(--accent-doux); }
+.jauge .barre { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--accent); width: 0; transition: width .6s ease-out; }
+.jauge .repere { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--seuil); }
+.score { font-variant-numeric: tabular-nums; font-weight: 600; font-size: .95rem; min-width: 3.2rem; text-align: right; }
+
+.texte p { margin: 0 0 .75rem; }
+.texte ul { margin: 0 0 .75rem; padding-left: 1.25rem; }
+.reponse pre, .texte pre { overflow-x: auto; background: var(--fond); border: 1px solid var(--ligne); border-radius: 8px; padding: .75rem 1rem; font-size: .85rem; line-height: 1.45; }
+.reponse code, .texte code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+.texte details { border-top: 1px solid var(--ligne); padding-top: .75rem; }
+.texte summary { cursor: pointer; color: var(--accent); font-weight: 600; margin-bottom: .5rem; }
+
+.fonctionnement { margin-top: 3rem; color: var(--texte-doux); font-size: .92rem; border-top: 1px solid var(--ligne); padding-top: 1.25rem; }
+.fonctionnement summary { cursor: pointer; color: var(--encre); font-weight: 600; }
+.fonctionnement p { max-width: 40rem; }
+.legende { display: inline-block; width: 2px; height: .9em; background: var(--seuil); vertical-align: -0.1em; margin: 0 .2rem; }
+
+@media (max-width: 520px) {
+  .rag { padding-top: 2rem; }
+  .rag form { flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jauge .barre { transition: none; }
+}

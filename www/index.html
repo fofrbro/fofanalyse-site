@@ -97,14 +97,17 @@
             </ul>
           </article>
 
-          <!-- À COMPLÉTER : description détaillée et lien de démo du RAG (rag.fofanalyse.com). -->
-          <article class="card todo">
-            <p class="meta"><span class="badge">2026</span>Python · PostgreSQL · pgvector · Linux</p>
+          <article class="card">
+            <p class="meta"><span class="badge">2026</span>Python · PostgreSQL · pgvector · Cloudflare Workers</p>
             <h3>RAG sur PostgreSQL + pgvector</h3>
             <ul>
-              <li>Questions-réponses sur documents : découpage, embeddings, recherche vectorielle sous PostgreSQL.</li>
+              <li>Questions sur mon profil et mes révisions DP-700 : passages découpés et vectorisés (multilingual-e5-small), stockés dans PostgreSQL avec pgvector.</li>
+              <li>La question est vectorisée dans le navigateur ; PostgreSQL retrouve les 3 passages les plus proches au-dessus d'un seuil de pertinence.</li>
+              <li>Le modèle de langage répond uniquement à partir de ces passages, qu'il cite ; sans passage pertinent, il n'est pas appelé.</li>
             </ul>
-            <p class="meta">Démo bientôt en ligne.</p>
+            <div class="buttons">
+              <a class="button primary" href="rag/">Poser une question</a>
+            </div>
           </article>
 
           <article class="card">

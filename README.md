@@ -57,8 +57,11 @@ Vérifier que le PDF tient sur une page.
 
 ## À compléter
 
-- **Projet RAG** : description détaillée et lien de démo
-  (`rag.fofanalyse.com`) dans les deux pages d'accueil.
+- **Page RAG** (`www/rag/`) : une fois le Worker déployé
+  (`npx wrangler deploy`), remplacer `fofanalyse-rag.A-REMPLACER.workers.dev`
+  par son adresse dans `www/rag/rag.js` et dans la CSP `/rag/*` de
+  `deploy/Caddyfile`. En local, la page appelle `http://localhost:8787`
+  (`npx wrangler dev`).
 - **Liens GitHub** : `github.com/fofrbro/data-engineering-agent` répondra
   une fois le dépôt de l'agent poussé.
 

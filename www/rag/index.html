@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Posez votre question · Cheikhou FOFANA</title>
+  <meta name="description" content="Recherche sémantique (RAG) sur le profil de Cheikhou FOFANA et ses révisions DP-700 : PostgreSQL, pgvector et un modèle de langage encadré.">
+  <link rel="canonical" href="https://fofanalyse.com/rag/">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="rag.css">
+  <script type="module" src="rag.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="../">Cheikhou FOFANA</a>
+      <nav class="nav" aria-label="Navigation principale">
+        <a href="../#apropos">À propos</a>
+        <a href="../#projets">Projets</a>
+        <a href="../#parcours">Parcours</a>
+        <a href="../#competences">Compétences</a>
+        <a href="../contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="rag">
+    <h1>Posez votre question</h1>
+    <p class="intro">
+      Cette recherche sémantique retrouve, dans mon profil ou dans mes révisions de la certification DP-700,
+      les passages les plus proches du sens de votre question, même s'ils n'emploient pas les mêmes mots.
+      Elle fonctionne aussi en anglais.
+    </p>
+
+    <div class="sources" role="radiogroup" aria-label="Où chercher">
+      <label><input type="radio" name="source" value="profil" checked><span>Mon profil</span></label>
+      <label><input type="radio" name="source" value="dp700"><span>Révisions DP-700</span></label>
+      <label><input type="radio" name="source" value="tout"><span>Tout</span></label>
+    </div>
+
+    <form id="formulaire">
+      <input id="question" type="search" autocomplete="off" required maxlength="300" aria-label="Votre question"
+             placeholder="Par exemple : quelle expérience avec PostgreSQL ?">
+      <button class="rechercher" type="submit">Rechercher</button>
+    </form>
+
+    <ul class="suggestions" id="suggestions" aria-label="Exemples de questions"></ul>
+
+    <p class="etat" id="etat" aria-live="polite"></p>
+    <div class="reponse" id="reponse" hidden aria-live="polite"></div>
+    <h2 class="extraits-titre" id="extraits-titre" hidden>Extraits utilisés</h2>
+    <ol class="resultats" id="resultats"></ol>
+
+    <details class="fonctionnement">
+      <summary>Comment fonctionne cette recherche</summary>
+      <p>
+        Les textes de la base ont été découpés en passages, convertis en vecteurs par le modèle
+        multilingual-e5-small, puis stockés dans une base PostgreSQL avec l'extension pgvector.
+        Votre question est convertie de la même façon, directement dans votre navigateur ; PostgreSQL
+        retrouve ensuite les passages dont le vecteur est le plus proche (similarité cosinus), trois au
+        maximum. Enfin, un modèle de langage (OpenAI) rédige une réponse fondée uniquement sur ces passages.
+        Sans passage pertinent, le modèle n'est pas appelé.
+      </p>
+      <p>
+        La jauge représente ce score sur une échelle de 0,70 à 1,00. Le repère<span class="legende" aria-hidden="true"></span>
+        marque le seuil de 0,80 : en dessous, un passage est jugé hors sujet et écarté.
+        Au premier usage, le modèle (environ 120 Mo) est téléchargé puis gardé en cache.
+      </p>
+      <p>
+        Les questions DP-700 sont issues de mes entraînements sur les évaluations pratiques Microsoft Learn,
+        dédoublonnées et corrigées.
+      </p>
+    </details>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">© 2026 Cheikhou FOFANA · Cette page n'utilise ni cookie ni traceur. Le modèle e5 est téléchargé depuis Hugging Face ; votre question est transmise à l'API du site puis à OpenAI.</div>
+  </footer>
+</body>
+</html>

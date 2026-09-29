@@ -13,10 +13,15 @@ fofanalyse.com {
 	import securite
 	encode gzip
 
-	header {
-		# Site sans script ni ressource externe : politique stricte.
-		Content-Security-Policy "default-src 'self'; script-src 'none'; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
-	}
+	# Site sans script ni ressource externe : politique stricte.
+	@site not path /rag/*
+	header @site Content-Security-Policy "default-src 'self'; script-src 'none'; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
+
+	# Page RAG : le modèle e5 tourne dans le navigateur (transformers.js depuis
+	# jsDelivr, WebAssembly, fichiers du modèle chez Hugging Face) et interroge
+	# l'API du Worker. Remplacer l'adresse workers.dev par celle du déploiement.
+	@rag path /rag/*
+	header @rag Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://fofanalyse-rag.A-REMPLACER.workers.dev; worker-src 'self' blob:; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
 
 	# Formulaire de contact : petites requêtes seulement.
 	handle /api/contact* {
