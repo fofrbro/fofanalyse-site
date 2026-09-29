@@ -19,9 +19,9 @@ fofanalyse.com {
 
 	# Page RAG : le modèle e5 tourne dans le navigateur (transformers.js depuis
 	# jsDelivr, WebAssembly, fichiers du modèle chez Hugging Face) et interroge
-	# l'API du Worker. Remplacer l'adresse workers.dev par celle du déploiement.
+	# l'API du Worker (même adresse que API_EN_LIGNE dans www/rag/rag.js).
 	@rag path /rag/*
-	header @rag Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://fofanalyse-rag.A-REMPLACER.workers.dev; worker-src 'self' blob:; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
+	header @rag Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://fofanalyse-rag.fofanalyse.workers.dev; worker-src 'self' blob:; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
 
 	# Formulaire de contact : petites requêtes seulement.
 	handle /api/contact* {

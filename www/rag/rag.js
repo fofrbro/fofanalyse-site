@@ -6,10 +6,10 @@ import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers
 
 // --- Réglages -----------------------------------------------------------
 // Adresse de l'API (Worker). En local, « npx wrangler dev » écoute sur 8787 ;
-// en ligne, remplacer par l'adresse donnée par « npx wrangler deploy »
-// (et l'ajouter à connect-src dans deploy/Caddyfile).
+// en ligne, l'adresse donnée par « npx wrangler deploy ». Si elle change,
+// la changer aussi dans connect-src (deploy/Caddyfile).
 const API_LOCALE = "http://localhost:8787";
-const API_EN_LIGNE = "https://fofanalyse-rag.A-REMPLACER.workers.dev";
+const API_EN_LIGNE = "https://fofanalyse-rag.fofanalyse.workers.dev";
 const API_URL = ["localhost", "127.0.0.1"].includes(location.hostname) ? API_LOCALE : API_EN_LIGNE;
 const MODELE_WEB = "Xenova/multilingual-e5-small"; // version navigateur du modèle e5
 const SEUIL = 0.80;          // le seuil réel est appliqué en SQL ; ici, pour la jauge
