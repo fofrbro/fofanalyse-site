@@ -17,8 +17,11 @@ renouvelle seul les certificats HTTPS :
 
 ## 1. Le serveur
 
-VPS Linux, 2 vCPU, 2 à 4 Go de RAM, Ubuntu 24.04 (Hetzner, OVH…, environ
-4 à 6 € par mois), connexion par clé SSH.
+VPS OVH « VPS-1 » (2 vCore, 4 Go de RAM, 40 Go NVMe, Gravelines), Ubuntu
+26.04 LTS, utilisateur `ubuntu`, environ 55 € TTC par an. Installer le
+système **avec la clé SSH publique** (espace client OVH, « Réinstaller mon
+VPS ») : le mot de passe envoyé par lien n'est alors plus nécessaire, sauf
+pour le changement imposé à la première connexion.
 
 ## 2. Le nom de domaine
 
@@ -35,22 +38,48 @@ Chez le registraire de `fofanalyse.com`, créer (ou modifier) :
 
 ## 3. Préparer le serveur
 
+Exécuté le 2026-09-30 sur le VPS (Ubuntu 26.04).
+
 ```bash
-apt update && apt upgrade -y
+sudo apt update && sudo apt full-upgrade -y
+```
+
+Pare-feu : SSH et web seulement. Docker contourne `ufw` pour les ports
+qu'il publie ; seul Caddy en publie (80 et 443), les autres services restent
+internes.
+
+```bash
+sudo ufw allow OpenSSH && sudo ufw allow 80/tcp && sudo ufw allow 443 && sudo ufw --force enable
+```
+
+Connexion par clé uniquement, pas de root. Le fichier `00-…` est lu avant
+celui d'OVH (`50-cloud-init.conf`) : la première valeur lue l'emporte. Sur
+Ubuntu 26.04, SSH est lancé à la demande (`ssh.socket`) : chaque nouvelle
+connexion lit la configuration, il n'y a rien à recharger.
+
+```bash
+printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin no\n' | sudo tee /etc/ssh/sshd_config.d/00-securite.conf && sudo sshd -t
+```
+
+Vérifier depuis une **deuxième** fenêtre avant de fermer la première : la
+clé ouvre la session, `ssh -o PubkeyAuthentication=no ubuntu@IP` répond
+`Permission denied (publickey)`.
+
+Docker, depuis les paquets d'Ubuntu (suivis par les mises à jour de sécurité
+automatiques), utilisable sans `sudo` après reconnexion :
+
+```bash
+sudo apt install -y docker.io docker-compose-v2 git && sudo usermod -aG docker ubuntu
 ```
 
 ```bash
-ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw enable
-```
-
-```bash
-curl -fsSL https://get.docker.com | sh
+docker run --rm hello-world && docker compose version
 ```
 
 ## 4. Récupérer les deux dépôts, côte à côte
 
 ```bash
-mkdir -p /srv && cd /srv
+sudo mkdir -p /srv && sudo chown ubuntu:ubuntu /srv && cd /srv
 ```
 
 ```bash
