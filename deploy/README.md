@@ -9,11 +9,11 @@ renouvelle seul les certificats HTTPS :
 | `https://www.fofanalyse.com` | redirection vers `fofanalyse.com` |
 | `https://demo.fofanalyse.com` | l'agent Data Engineering en mode démo |
 
-> Ces fichiers n'ont pas encore été exécutés : Docker n'était pas
-> disponible sur le poste de développement. Le site, le service de contact
-> (tests automatisés, essai en navigateur avec envoi simulé) et le mode démo
-> de l'agent sont testés. Premier déploiement : suivre les vérifications de
-> l'étape 6.
+> En ligne depuis le 2026-09-30 : pages FR/EN, CV, page RAG et démo vérifiés
+> en HTTPS (certificats Let's Encrypt obtenus par Caddy), parcours complet de
+> la démo sur l'exemple « ventes » (INGEST, 1 500 lignes). **Le formulaire de
+> contact n'envoie pas encore** : le SMTP sera configuré après le transfert
+> du domaine chez OVH (voir l'étape 5).
 
 ## 1. Le serveur
 
@@ -25,16 +25,23 @@ pour le changement imposé à la première connexion.
 
 ## 2. Le nom de domaine
 
-Chez le registraire de `fofanalyse.com`, créer (ou modifier) :
+Dans la zone DNS de `fofanalyse.com` (Viaduc pendant le transfert, puis
+OVH), créer ou modifier :
 
 | Type | Nom | Valeur |
 |---|---|---|
-| A | `@` (domaine nu) | adresse IPv4 du VPS (remplace l'actuelle, 87.98.150.35) |
-| A | `www` | adresse IPv4 du VPS |
-| A | `demo` | adresse IPv4 du VPS |
+| A | `@` (domaine nu) | `146.59.155.98` (remplace la page d'attente, 87.98.150.35) |
+| A | `www` | `146.59.155.98` |
+| A | `demo` | `146.59.155.98` |
 
 **Ne pas toucher aux enregistrements MX** : ils acheminent le courrier de
 `cheikhou@fofanalyse.com`.
+
+À la fin du transfert, si OVH bascule le domaine sur ses propres serveurs
+DNS, **recréer ces trois lignes chez OVH le jour même**, ainsi que la
+messagerie (MX et SPF d'OVH), sinon le site et le courrier s'arrêtent.
+Caddy lance l'obtention des certificats dès son démarrage : ne le démarrer
+qu'une fois ces noms dirigés vers le serveur.
 
 ## 3. Préparer le serveur
 
