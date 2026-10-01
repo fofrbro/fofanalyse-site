@@ -90,12 +90,16 @@
           </article>
 
           <article class="card">
-            <p class="meta"><span class="badge">2026</span>Microsoft Fabric · PySpark · Delta Lake · Power BI</p>
-            <h3>End-to-end data pipeline on Microsoft Fabric</h3>
+            <p class="meta"><span class="badge">2026</span>Microsoft Fabric · PySpark · Delta Lake · yfinance</p>
+            <h3>Market data platform on Microsoft Fabric</h3>
             <ul>
-              <li>Multi-source ingestion and PySpark transformation, stored as Delta tables.</li>
-              <li>Bronze / silver / gold medallion architecture in a Lakehouse, delivered in a Power BI report.</li>
+              <li>Prices of 12 instruments listed on 3 exchanges in 3 currencies, 2015 to 2026, ingested with exchange rates.</li>
+              <li>Medallion architecture in a Lakehouse: traced bronze that is never corrected, reliable silver (real trading days, conversion to US dollars), gold with volatility, Sharpe ratio and maximum drawdown.</li>
+              <li>Quality control: extreme moves are flagged then checked, never deleted automatically.</li>
             </ul>
+            <div class="buttons">
+              <a class="button" href="https://github.com/fofrbro/finance-market-data">View the code</a>
+            </div>
           </article>
 
           <article class="card">
