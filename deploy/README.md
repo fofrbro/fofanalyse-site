@@ -176,3 +176,32 @@ cd /srv/fofanalyse-site/deploy && docker compose up -d --build
 
 Les pages du site sont servies directement depuis `www/` : un `git pull`
 suffit à les publier.
+
+Si le `Caddyfile` a changé (une nouvelle page avec sa CSP, par exemple),
+le valider puis le recharger, sans couper le site :
+
+```bash
+cd /srv/fofanalyse-site/deploy && docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile && docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+Vérifier ensuite depuis l'extérieur l'en-tête de la page concernée, par
+exemple `curl -sI https://fofanalyse.com/acces/ | grep -i content-security`.
+Si l'ancienne politique persiste, contrôler que le conteneur voit le nouveau
+fichier (`docker compose exec caddy grep acces /etc/caddy/Caddyfile`) ; sinon
+`docker compose up -d --force-recreate caddy` (certificats conservés dans le
+volume `caddy_data`).
+
+## 8. Le RAG avec habilitations
+
+La page `/acces/` interroge un second Worker Cloudflare, `fofanalyse-acces`
+(projet `rag-habilitations`), relié à la même base Neon que le RAG. Ses
+secrets (`DATABASE_URL`, `OPENAI_API_KEY`, `JETON_SECRET`) sont envoyés depuis
+son fichier `api/.dev.vars`, sans copier-coller :
+
+```powershell
+foreach ($n in 'DATABASE_URL','OPENAI_API_KEY','JETON_SECRET') { $v = (Get-Content .dev.vars | Where-Object { $_ -like "$n=*" }).Substring($n.Length + 1).Trim('"'); $v | npx.cmd wrangler secret put $n }
+```
+
+Mis en ligne et vérifié le 2026-10-04 : refus pour le chef d'équipe et
+réponse pour le directeur sur le chiffre d'affaires, silence sur les sujets
+secrets, comparaison des profils.
