@@ -14,14 +14,15 @@ fofanalyse.com {
 	encode gzip
 
 	# Site sans script ni ressource externe : politique stricte.
-	@site not path /rag/*
+	@site not path /rag/* /acces/*
 	header @site Content-Security-Policy "default-src 'self'; script-src 'none'; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
 
-	# Page RAG : le modèle e5 tourne dans le navigateur (transformers.js depuis
-	# jsDelivr, WebAssembly, fichiers du modèle chez Hugging Face) et interroge
-	# l'API du Worker (même adresse que API_EN_LIGNE dans www/rag/rag.js).
-	@rag path /rag/*
-	header @rag Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://fofanalyse-rag.fofanalyse.workers.dev; worker-src 'self' blob:; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
+	# Pages RAG (/rag/) et RAG avec habilitations (/acces/) : le modèle e5
+	# tourne dans le navigateur (transformers.js depuis jsDelivr, WebAssembly,
+	# fichiers du modèle chez Hugging Face) et interroge l'API de chaque Worker
+	# (mêmes adresses que API_EN_LIGNE dans www/rag/rag.js et www/acces/acces.js).
+	@rag path /rag/* /acces/*
+	header @rag Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://fofanalyse-rag.fofanalyse.workers.dev https://fofanalyse-acces.fofanalyse.workers.dev; worker-src 'self' blob:; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
 
 	# Formulaire de contact : petites requêtes seulement.
 	handle /api/contact* {

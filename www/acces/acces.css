@@ -1,0 +1,70 @@
+/* Page « RAG et habilitations ». Complète rag/rag.css (mêmes variables). */
+
+.acces .profils { border: 0; padding: 0; margin: 0 0 .5rem; }
+.acces .profils legend { font-weight: 600; margin-bottom: .6rem; color: var(--encre); }
+.liste-profils { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .5rem; }
+.profil { position: relative; display: block; cursor: pointer; }
+.profil input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.profil .carte {
+  display: grid; gap: .35rem; height: 100%; padding: .7rem .85rem;
+  border: 1px solid var(--ligne); border-radius: var(--rayon); background: var(--surface);
+}
+.profil .nom { font-weight: 600; color: var(--encre); }
+.profil input:checked + .carte { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-doux); }
+.profil input:focus-visible + .carte { outline: 2px solid var(--accent); outline-offset: 2px; }
+.groupes { display: flex; flex-wrap: wrap; gap: .25rem; }
+.groupe { font-size: .72rem; padding: .05rem .45rem; border-radius: 999px; background: var(--fond); color: var(--texte-doux); border: 1px solid var(--ligne); }
+
+.session { min-height: 1.4rem; margin: .4rem 0 1rem; font-size: .9rem; color: var(--texte-doux); }
+.session strong { color: var(--accent); }
+
+.comparer {
+  margin-top: .9rem; background: transparent; color: var(--accent); border: 1px solid var(--accent);
+  border-radius: var(--rayon); padding: .55rem 1rem; font-weight: 600;
+}
+.comparer:disabled { opacity: .6; cursor: progress; }
+
+/* Décision : refus annoncé, silence, ou réponse partielle */
+.decision { border-radius: var(--rayon); padding: .9rem 1.1rem; margin-bottom: 1.2rem; border: 1px solid var(--ligne); background: var(--surface); }
+.decision.refus, .decision.partiel { border-left: 4px solid var(--seuil); }
+.decision.rien { border-left: 4px solid var(--ligne); color: var(--texte-doux); }
+.decision strong { display: block; margin-bottom: .2rem; color: var(--encre); }
+
+/* Niveaux de confidentialité */
+.niveau { display: inline-block; font-size: .72rem; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; padding: .05rem .5rem; border-radius: 999px; border: 1px solid currentColor; margin-left: .4rem; }
+.niveau.public { color: #2f7d4f; }
+.niveau.interne { color: var(--accent); }
+.niveau.confidentiel { color: var(--seuil); }
+.niveau.secret { color: #b42318; }
+@media (prefers-color-scheme: dark) {
+  .niveau.public { color: #6fcf97; }
+  .niveau.secret { color: #f97066; }
+}
+
+/* Comparaison des profils */
+.comparaison { margin-top: 2rem; padding: 0; border: 0; }
+.comparaison h2 { font-size: 1.1rem; margin: 0 0 .3rem; color: var(--encre); }
+.comparaison .note { color: var(--texte-doux); font-size: .88rem; margin: 0 0 .8rem; }
+.tableau { overflow-x: auto; border: 1px solid var(--ligne); border-radius: var(--rayon); background: var(--surface); }
+.tableau table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+.tableau th, .tableau td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--ligne); vertical-align: top; }
+.tableau tr:last-child td { border-bottom: 0; }
+.tableau th { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--texte-doux); }
+.tableau td:first-child { font-weight: 600; white-space: nowrap; }
+.tableau ul { margin: 0; padding-left: 1rem; }
+.tableau .refuse { color: var(--seuil); }
+.tableau .vide { color: var(--texte-doux); font-style: italic; }
+
+@media (max-width: 520px) {
+  .liste-profils { grid-template-columns: 1fr 1fr; }
+  /* Sur téléphone, la comparaison devient une carte par profil. */
+  .tableau thead { display: none; }
+  .tableau table, .tableau tbody, .tableau tr, .tableau td { display: block; width: 100%; }
+  .tableau tr { border-bottom: 1px solid var(--ligne); padding: .2rem 0; }
+  .tableau tr:last-child { border-bottom: 0; }
+  .tableau td { border-bottom: 0; padding: .35rem .8rem; }
+  .tableau td:first-child { white-space: normal; color: var(--accent); padding-bottom: 0; }
+}
+@media (max-width: 360px) {
+  .liste-profils { grid-template-columns: 1fr; }
+}

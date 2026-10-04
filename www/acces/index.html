@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAG et habilitations · Cheikhou FOFANA</title>
+  <meta name="description" content="Démonstration d'un RAG qui respecte les habilitations : la même question donne une réponse différente selon le profil, filtrée dans PostgreSQL et non par l'IA.">
+  <link rel="canonical" href="https://fofanalyse.com/acces/">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../rag/rag.css">
+  <link rel="stylesheet" href="acces.css">
+  <script type="module" src="acces.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="../">Cheikhou FOFANA</a>
+      <nav class="nav" aria-label="Navigation principale">
+        <a href="../#apropos">À propos</a>
+        <a href="../#projets">Projets</a>
+        <a href="../#parcours">Parcours</a>
+        <a href="../#competences">Compétences</a>
+        <a href="../contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="rag acces">
+    <h1>Un assistant qui respecte les habilitations</h1>
+    <p class="intro">
+      Deux organisations <strong>fictives</strong>, une confiserie et une mairie, avec leurs documents internes.
+      Choisissez un profil et posez une question : un opérateur et un directeur n'obtiennent pas la même réponse.
+      Le filtrage se fait dans la base de données, avant que l'IA ne lise quoi que ce soit.
+    </p>
+
+    <div class="sources" role="radiogroup" aria-label="Organisation">
+      <label><input type="radio" name="org" value="confiserie" checked><span>Confiserie Bellefleur</span></label>
+      <label><input type="radio" name="org" value="mairie"><span>Mairie de Mérivale</span></label>
+    </div>
+
+    <fieldset class="profils">
+      <legend>Se connecter en tant que</legend>
+      <div id="profils" class="liste-profils"></div>
+    </fieldset>
+    <p class="session" id="session" aria-live="polite"></p>
+
+    <form id="formulaire">
+      <input id="question" type="search" autocomplete="off" required maxlength="300" aria-label="Votre question"
+             placeholder="Par exemple : quel est le chiffre d'affaires 2025 ?">
+      <button class="rechercher" type="submit">Demander</button>
+    </form>
+    <ul class="suggestions" id="suggestions" aria-label="Exemples de questions"></ul>
+    <button class="comparer" id="comparer" type="button">Comparer tous les profils sur cette question</button>
+
+    <p class="etat" id="etat" aria-live="polite"></p>
+    <div class="decision" id="decision" hidden></div>
+    <div class="reponse" id="reponse" hidden aria-live="polite"></div>
+    <h2 class="extraits-titre" id="extraits-titre" hidden>Documents autorisés pour ce profil</h2>
+    <ol class="resultats" id="resultats"></ol>
+
+    <section class="comparaison" id="comparaison" hidden aria-live="polite">
+      <h2>Ce que chaque profil obtient</h2>
+      <p class="note">Vue de démonstration, sans appel à l'IA : pour chaque profil, les documents que la base accepte de lui renvoyer.</p>
+      <div class="tableau"><table>
+        <thead><tr><th>Profil</th><th>Résultat</th></tr></thead>
+        <tbody id="lignes-comparaison"></tbody>
+      </table></div>
+    </section>
+
+    <details class="fonctionnement">
+      <summary>Comment les droits sont protégés</summary>
+      <p>
+        Ce n'est pas l'IA qui décide de ce qu'un utilisateur peut voir : une consigne du type « ne le dis pas au chef d'équipe »
+        se contourne. Chaque document porte la liste des groupes autorisés à le lire. En choisissant un profil, vous recevez
+        un jeton signé par le serveur ; vos habilitations sont lues côté serveur, jamais envoyées par votre navigateur.
+      </p>
+      <p>
+        PostgreSQL applique ensuite une <strong>Row-Level Security</strong> : pour chaque recherche, la base ne renvoie que les
+        documents de votre organisation qui partagent un groupe avec votre profil. Même en demandant un document réservé par son
+        numéro, il ne sort pas. L'IA ne reçoit que ce qui vous est autorisé.
+      </p>
+      <p>
+        Quand un sujet existe mais vous est interdit, deux comportements sont possibles : le dire (« réservé à la direction »),
+        ou rester silencieux pour un sujet sensible, comme un projet de réorganisation qui ne doit pas être révélé.
+      </p>
+    </details>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">© 2026 Cheikhou FOFANA · Organisations et chiffres fictifs. Cette page n'utilise ni cookie ni traceur ; le modèle e5 est téléchargé depuis Hugging Face et vos questions sont transmises à l'API du site puis à OpenAI.</div>
+  </footer>
+</body>
+</html>
