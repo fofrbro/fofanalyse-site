@@ -37,9 +37,9 @@ const SUGGESTIONS = {
   confiserie: [
     "Quel est le chiffre d'affaires 2025 ?",
     "Que faire si le détecteur de métaux éjecte un produit ?",
-    "Quel est le salaire d'un chef d'équipe ?",
+    "Quelles formations sont prévues en 2027 ?",
     "Quel est le score du dernier audit IFS ?",
-    "Y a-t-il un projet de réorganisation de l'équipe de nuit ?",
+    "Y a-t-il un projet de rachat de la Biscuiterie des Monts ?",
   ],
   mairie: [
     "Quel est le budget voté pour 2026 ?",
