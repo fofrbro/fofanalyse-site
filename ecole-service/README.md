@@ -69,6 +69,14 @@ sa leçon et au moins 10 questions réparties sur les 3 niveaux. Il n'y a rien
 explication. En anglais, le vocabulaire se tape au clavier (« a », « an »,
 « the » acceptés devant le mot).
 
+**Argent** (onglet « Argent », le même pour toutes les classes) — éducation
+financière en 6 chapitres : pièces, billets et monnaie ; argent de poche et
+budget ; bien acheter (comparer deux offres, soldes) ; besoins, envies et
+épargne ; la banque et les moyens de payer (code secret, arnaques, paiement
+en ligne) ; d'où vient l'argent (salaire, troc, impôts, prix). Les trois
+premiers sont des calculs tirés et résolus par le code (`argent.py`, en
+centimes) ; les trois autres, des questions vérifiées.
+
 **Arabe** (onglet « Arabe », le même pour toutes les classes) — 7 chapitres :
 les lettres (en trois groupes : nom, son, points), les lettres attachées
 (début, milieu, fin d'un mot), les voyelles (fatha, kasra, damma, voyelles

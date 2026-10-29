@@ -15,6 +15,7 @@ d'exercices, et une ligne dans CLASSES ci-dessous et dans catalogue.py.
 import lecons_6e
 import lecons_cm2
 import arabe
+import argent
 import lecons_francais
 import quiz
 
@@ -200,7 +201,7 @@ CHAPITRES_CM1 = [
     },
 ]
 
-MATIERES = {"maths": "Mathématiques", "francais": "Français", **quiz.NOMS, "arabe": "Arabe"}
+MATIERES = {"maths": "Mathématiques", "francais": "Français", **quiz.NOMS, "argent": "Argent", "arabe": "Arabe"}
 MATHS = {"CM1": CHAPITRES_CM1, "CM2": lecons_cm2.CHAPITRES, "6e": lecons_6e.CHAPITRES}
 PAR_MATIERE = {"maths": MATHS, "francais": lecons_francais.PAR_CLASSE,
                **{m: quiz.lecons_par_classe(m) for m in quiz.MODULES}}
@@ -216,10 +217,12 @@ CLASSES = {
     for nom, age in (("CM1", 9), ("CM2", 10), ("6e", 11))
 }
 
-# Matières qui ne dépendent pas de la classe (l'arabe) : proposées à toutes les classes.
-COMMUNS = arabe.CHAPITRES
-for _chapitre in COMMUNS:
-    _chapitre["classe"], _chapitre["matiere"] = None, "arabe"
+# Matières qui ne dépendent pas de la classe (l'argent, l'arabe) : proposées à toutes les classes.
+COMMUNS = []
+for _matiere, _chapitres in (("argent", argent.CHAPITRES), ("arabe", arabe.CHAPITRES)):
+    for _chapitre in _chapitres:
+        _chapitre["classe"], _chapitre["matiere"] = None, _matiere
+    COMMUNS += _chapitres
 
 CHAPITRES = [c for infos in CLASSES.values() for c in infos["chapitres"]] + COMMUNS
 PAR_ID = {c["id"]: c for c in CHAPITRES}
