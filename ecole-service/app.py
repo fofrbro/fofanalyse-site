@@ -25,6 +25,7 @@ Configuration (deploy/.env) :
 
 import base64
 import hashlib
+import re
 import hmac
 import json
 import os
@@ -99,6 +100,21 @@ def verifier_session(secret: str, valeur: str | None) -> dict | None:
     return contenu
 
 
+def decouper_pour_la_voix(texte: str, taille: int = 700) -> list[str]:
+    """Un cours en paragraphes courts : le premier se dit vite, les suivants se préparent pendant ce temps."""
+    resultat = []
+    for paragraphe in (p.strip() for p in re.split(r"\n\s*\n", texte) if p.strip()):
+        phrases, courant = re.split(r"(?<=[.!?…])\s+", paragraphe), ""
+        for phrase in phrases:
+            if courant and len(courant) + len(phrase) > taille:
+                resultat.append(courant)
+                courant = ""
+            courant = f"{courant} {phrase}".strip()
+        if courant:
+            resultat.append(courant)
+    return resultat
+
+
 def creer_app(config: Config | None = None, tuteur=None, voix=None, coran=None) -> Starlette:
     config = config or Config()
     tuteur = tuteur or depuis_environnement()
@@ -125,6 +141,10 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None, coran=None) 
     def profil(role) -> dict:
         return {"role": role, "prenom": config.prenom, "tuteur": tuteur.actif, "voix": voix.active,
                 "classe": classe()}
+
+    def voix_choisie() -> str:
+        choisie = stock.reglage("voix", voix.voix)
+        return choisie if choisie in V.VOIX_DISPONIBLES else voix.voix
 
     def pour_tuteur(chapitre=None) -> dict:
         infos = {"classe": classe(), "age": lecons.CLASSES[classe()]["age"]}
@@ -289,15 +309,55 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None, coran=None) 
         if not voix.active:
             return erreur("La voix n'est pas branchée.", 503)
         age = pour_tuteur()["age"]
-        nom = voix.nom(texte, age)
+        # Le parent peut écouter une autre voix avant de la choisir
+        quelle = donnees.get("voix") if request.state.role == "parent" and donnees.get("voix") in V.VOIX_DISPONIBLES \
+            else voix_choisie()
+        nom = voix.nom(texte, age, quelle)
         if not voix.deja_lu(nom):
             if not stock.compter_appel_voix(config.voix_par_jour):
                 return erreur("La maîtresse a assez parlé pour aujourd'hui. Reviens demain !", 429)
             try:
-                nom = await run_in_threadpool(voix.generer, texte, age)
+                nom = await run_in_threadpool(voix.generer, texte, age, quelle)
             except V.VoixIndisponible:
                 return erreur("La voix ne répond pas. Réessaie dans un moment.", 502)
         return JSONResponse({"audio": f"/api/ecole/voix/{nom}"})
+
+    @protege()
+    async def expliquer(request: Request):
+        """Le cours de la maîtresse sur une leçon : écrit par l'IA une seule fois, puis gardé."""
+        donnees = await corps_json(request) or {}
+        chapitre = donnees.get("chapitre")
+        if chapitre not in chapitres_ouverts():
+            return erreur("Chapitre inconnu.")
+        texte = stock.explication(chapitre, classe())
+        if not texte:
+            reponse = await appeler_tuteur(tuteur.expliquer_lecon, lecons.lecon_en_texte(chapitre), **pour_tuteur(chapitre))
+            if reponse.status_code != 200:
+                return reponse
+            texte = json.loads(reponse.body)["reponse"]
+            stock.garder_explication(chapitre, classe(), texte)
+        return JSONResponse({"paragraphes": decouper_pour_la_voix(texte)})
+
+    @protege()
+    async def ecouter(request: Request):
+        """L'enfant parle au micro : on transcrit sa question, la page la pose ensuite au tuteur."""
+        type_mime = request.headers.get("content-type", "")
+        if not type_mime.startswith("audio/"):
+            return erreur("Enregistrement audio attendu.")
+        audio = await request.body()
+        if not audio or len(audio) > V.MAX_AUDIO_ENFANT:
+            return erreur("L'enregistrement est vide ou trop long : une minute au maximum.")
+        if not voix.active:
+            return erreur("Le micro a besoin de la clé OpenAI du tuteur.", 503)
+        if not stock.compter_appel_ia(config.ia_par_jour):
+            return erreur("Le tuteur se repose pour aujourd'hui. Reviens demain !", 429)
+        try:
+            texte = await run_in_threadpool(voix.transcrire, audio, type_mime)
+        except V.VoixIndisponible:
+            return erreur("Je n'ai pas réussi à t'entendre. Réessaie ou écris ta question.", 502)
+        if not texte:
+            return erreur("Je n'ai rien entendu. Parle un peu plus fort, près du micro.", 422)
+        return JSONResponse({"texte": texte[:400]})
 
     @protege()
     async def audio(request: Request):
@@ -371,11 +431,20 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None, coran=None) 
         ids = [c["id"] for c in lecons.chapitres_jusqua(classe())]
         return JSONResponse({**stock.suivi_parent(ids), "plafond_ia": config.ia_par_jour, "tuteur": tuteur.actif,
                              "voix": voix.active, "appels_voix_aujourdhui": stock.appels_voix_aujourdhui(),
+                             "voix_choisie": voix_choisie(), "voix_disponibles": V.VOIX_DISPONIBLES,
                              "plafond_voix": config.voix_par_jour,
                              "classe": classe(), "classes": list(lecons.CLASSES),
                              "coran": [{"numero": n, "nom": nom, "versets": total, **progres}
                                        for n, progres in sorted(stock.coran_progres().items())
                                        for _, nom, total in [Q.PAR_NUMERO[n]]]})
+
+    @protege("parent")
+    async def changer_voix(request: Request):
+        donnees = await corps_json(request) or {}
+        if donnees.get("voix") not in V.VOIX_DISPONIBLES:
+            return erreur("Voix inconnue.")
+        stock.regler("voix", donnees["voix"])
+        return JSONResponse({"voix": donnees["voix"]})
 
     @protege("parent")
     async def changer_classe(request: Request):
@@ -409,6 +478,9 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None, coran=None) 
         Route(f"{p}/tuteur", poser_question, methods=["POST"]),
         Route(f"{p}/autrement", autrement, methods=["POST"]),
         Route(f"{p}/voix", lire_a_voix_haute, methods=["POST"]),
+        Route(f"{p}/explication", expliquer, methods=["POST"]),
+        Route(f"{p}/ecoute", ecouter, methods=["POST"]),
+        Route(f"{p}/reglage-voix", changer_voix, methods=["POST"]),
         Route(f"{p}/coran", coran_sommaire),
         Route(f"{p}/coran/{{numero:int}}", coran_sourate),
         Route(f"{p}/coran/{{numero:int}}/progres", coran_progresser, methods=["POST"]),

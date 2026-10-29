@@ -127,6 +127,10 @@ class FauxTuteur:
         self.appels.append(("repondre", lecon, question, historique, classe))
         return "Voici une explication."
 
+    def expliquer_lecon(self, lecon, classe, age, matiere):
+        self.appels.append(("expliquer", lecon))
+        return "Bonjour ! Aujourd'hui, on parle des fractions.\n\nUn quart, c'est une part sur quatre.\n\nÀ toi de jouer !"
+
     def reexpliquer(self, lecon, ex, reponse, classe, age, matiere):
         self.appels.append(("reexpliquer", ex, reponse))
         return "Essayons autrement."
@@ -354,10 +358,11 @@ class FausseVoix:
         from voix import Voix
         self.vraie = Voix("cle", "modele", "coral", str(dossier))
         self.active = True
+        self.voix = "coral"
         self.generes = []
 
-    def nom(self, texte, age):
-        return self.vraie.nom(texte, age)
+    def nom(self, texte, age, voix=None):
+        return self.vraie.nom(texte, age, voix)
 
     def chemin(self, nom):
         return self.vraie.chemin(nom)
@@ -365,9 +370,13 @@ class FausseVoix:
     def deja_lu(self, nom):
         return self.vraie.deja_lu(nom)
 
-    def generer(self, texte, age):
+    def transcrire(self, audio, type_mime):
+        self.generes.append(("transcrire", type_mime))
+        return "C'est quoi un quart ?" if audio != b"silence" else ""
+
+    def generer(self, texte, age, voix=None):
         self.generes.append((texte, age))
-        nom = self.nom(texte, age)
+        nom = self.nom(texte, age, voix)
         self.vraie.dossier.mkdir(parents=True, exist_ok=True)
         self.chemin(nom).write_bytes(b"ID3 faux mp3")
         return nom
@@ -587,3 +596,49 @@ def test_coran_progression_et_audio(tmp_path):
     suivi = c.get("/api/ecole/suivi").json()
     assert suivi["coran"] == [{"numero": 112, "nom": "Al-Ikhlâs", "versets": 4, "versets_appris": 3,
                                "maj": suivi["coran"][0]["maj"]}]
+
+
+# --- La maîtresse : cours expliqué par l'IA, micro, choix de la voix ---------------------------------
+
+def test_cours_de_la_maitresse_explique_une_seule_fois(tmp_path):
+    env = {**ENV, "ECOLE_DB": str(tmp_path / "ecole.db")}
+    tuteur = FauxTuteur()
+    c = TestClient(creer_app(Config(env), tuteur, FausseVoix(tmp_path / "voix")), base_url="http://test")
+    se_connecter(c)
+    r = c.post("/api/ecole/explication", json={"chapitre": "fractions"}).json()
+    assert r["paragraphes"] == ["Bonjour ! Aujourd'hui, on parle des fractions.", "Un quart, c'est une part sur quatre.",
+                                "À toi de jouer !"]
+    assert "Les fractions" in tuteur.appels[-1][1]  # le cours suit la leçon
+    c.post("/api/ecole/explication", json={"chapitre": "fractions"})
+    assert sum(1 for a in tuteur.appels if a[0] == "expliquer") == 1  # gardé : pas de second appel à l'IA
+    assert c.post("/api/ecole/explication", json={"chapitre": "inconnu"}).status_code == 400
+    tuteur.actif = False
+    assert c.post("/api/ecole/explication", json={"chapitre": "tables"}).status_code == 503
+
+
+def test_decoupage_pour_la_voix():
+    from app import decouper_pour_la_voix
+    long = " ".join(["Une phrase assez longue pour remplir le paragraphe."] * 30)
+    morceaux = decouper_pour_la_voix(f"Court.\n\n{long}")
+    assert morceaux[0] == "Court." and all(len(m) <= 760 for m in morceaux) and len(morceaux) > 2
+
+
+def test_micro_et_choix_de_la_voix(tmp_path):
+    env = {**ENV, "ECOLE_DB": str(tmp_path / "ecole.db")}
+    voix = FausseVoix(tmp_path / "voix")
+    c = TestClient(creer_app(Config(env), FauxTuteur(), voix), base_url="http://test")
+    se_connecter(c)
+    entete = {"content-type": "audio/webm;codecs=opus"}
+    assert c.post("/api/ecole/ecoute", content=b"un enregistrement", headers=entete).json() == {"texte": "C'est quoi un quart ?"}
+    assert c.post("/api/ecole/ecoute", content=b"silence", headers=entete).status_code == 422
+    assert c.post("/api/ecole/ecoute", content=b"x", headers={"content-type": "text/plain"}).status_code == 400
+    # Seul le parent choisit la voix (et peut en écouter une autre avant)
+    assert c.post("/api/ecole/reglage-voix", json={"voix": "sage"}).status_code == 403
+    se_connecter(c, "papa-2026")
+    assert c.post("/api/ecole/reglage-voix", json={"voix": "robot"}).status_code == 400
+    assert c.post("/api/ecole/reglage-voix", json={"voix": "sage"}).json() == {"voix": "sage"}
+    suivi = c.get("/api/ecole/suivi").json()
+    assert suivi["voix_choisie"] == "sage" and "coral" in suivi["voix_disponibles"]
+    a = c.post("/api/ecole/voix", json={"texte": "Bonjour", "voix": "nova"}).json()["audio"]
+    b = c.post("/api/ecole/voix", json={"texte": "Bonjour"}).json()["audio"]
+    assert a != b  # deux voix différentes, deux audios différents

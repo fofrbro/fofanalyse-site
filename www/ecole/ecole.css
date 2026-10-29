@@ -227,6 +227,14 @@ select {
 .option-verset.bonne { border-color: var(--ok); }
 .option-verset.fausse { border-color: var(--faux); opacity: .6; }
 
+/* Cours de la maîtresse (sous-titres) */
+.cours { margin-top: 14px; background: var(--carte); border: 2px solid var(--etoile); border-radius: var(--rayon); padding: 10px 18px; }
+.cours p { margin: 8px 0; color: var(--doux); transition: color .2s; }
+.cours p.en-cours { color: var(--texte); font-weight: 600; }
+.cours .cours-titre { font-family: var(--titre); font-weight: 700; color: var(--etoile); }
+.cours .cours-attente { font-style: italic; }
+#micro.en-cours { background: var(--faux); border-color: var(--faux); color: var(--carte); }
+
 /* Tuteur */
 .tuteur { margin-top: 28px; }
 .tuteur-intro { color: var(--doux); margin: -4px 0 12px; }

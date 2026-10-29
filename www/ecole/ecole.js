@@ -93,47 +93,70 @@ function etoilesTotal() {
 
 const lecteur = new Audio();
 let boutonEnCours = null;
+let lectureEnCours = null;  // jeton de la lecture en cours : en changer arrête l'ancienne
 
 function arreterLecture() {
+  lectureEnCours = null;
   lecteur.pause();
   lecteur.removeAttribute("src");
   if ("speechSynthesis" in window) speechSynthesis.cancel();
   if (boutonEnCours) boutonEnCours.classList.remove("en-cours");
   boutonEnCours = null;
+  for (const p of document.querySelectorAll("#cours p")) p.classList.remove("en-cours");
 }
 
-function voixDuNavigateur(texte, bouton) {
-  if (!("speechSynthesis" in window)) return arreterLecture();
-  const phrase = new SpeechSynthesisUtterance(texte);
-  phrase.lang = "fr-FR";
-  phrase.rate = 0.9;
-  const francaise = speechSynthesis.getVoices().find((v) => v.lang.startsWith("fr"));
-  if (francaise) phrase.voice = francaise;
-  phrase.onend = () => { if (boutonEnCours === bouton) arreterLecture(); };
-  speechSynthesis.speak(phrase);
+function audioDe(texte) {
+  // L'adresse de l'audio (voix d'OpenAI, préparée par le serveur), ou null pour la voix de l'appareil.
+  if (!etat.voix) return Promise.resolve(null);
+  return api("/voix", { texte }).then((r) => r.audio).catch(() => null);
 }
 
-async function lire(texte, bouton) {
-  const memeBouton = boutonEnCours === bouton;
+function jouer(url, jeton) {
+  return new Promise((fini) => {
+    lecteur.onended = lecteur.onerror = fini;
+    lecteur.src = url;
+    lecteur.play().catch(fini);
+  }).then(() => lectureEnCours === jeton);
+}
+
+function direAvecLAppareil(texte, jeton) {
+  return new Promise((fini) => {
+    if (!("speechSynthesis" in window)) return fini();
+    const phrase = new SpeechSynthesisUtterance(texte);
+    phrase.lang = "fr-FR";
+    phrase.rate = 0.95;
+    const francaise = speechSynthesis.getVoices().find((v) => v.lang.startsWith("fr"));
+    if (francaise) phrase.voice = francaise;
+    phrase.onend = phrase.onerror = fini;
+    speechSynthesis.speak(phrase);
+  }).then(() => lectureEnCours === jeton);
+}
+
+async function dire(morceaux, bouton, quandMorceau) {
+  // Dit les morceaux à la suite ; le suivant se prépare pendant que le précédent se dit.
+  const memeBouton = bouton && boutonEnCours === bouton;
   arreterLecture();
-  if (memeBouton || !texte.trim()) return;  // deuxième clic : on arrête
-  boutonEnCours = bouton;
-  bouton.classList.add("en-cours");
-  if (etat.voix) {
-    try {
-      const r = await api("/voix", { texte });
-      if (boutonEnCours !== bouton) return;  // un autre bouton a été cliqué entre-temps
-      lecteur.src = r.audio;
-      await lecteur.play();
-      return;
-    } catch {
-      if (boutonEnCours !== bouton) return;
-    }
+  morceaux = morceaux.filter((m) => m && m.trim());
+  if (memeBouton || !morceaux.length) return;  // deuxième clic : on arrête
+  const jeton = {};
+  lectureEnCours = jeton;
+  boutonEnCours = bouton || null;
+  bouton?.classList.add("en-cours");
+  let prochain = audioDe(morceaux[0]);
+  for (let i = 0; i < morceaux.length; i++) {
+    const url = await prochain;
+    if (lectureEnCours !== jeton) return;
+    prochain = i + 1 < morceaux.length ? audioDe(morceaux[i + 1]) : null;
+    quandMorceau?.(i);
+    const continuer = url ? await jouer(url, jeton) : await direAvecLAppareil(morceaux[i], jeton);
+    if (!continuer) return;
   }
-  voixDuNavigateur(texte, bouton);
+  if (lectureEnCours === jeton) arreterLecture();
 }
 
-lecteur.addEventListener("ended", arreterLecture);
+function lire(texte, bouton) {
+  return dire([texte], bouton);
+}
 
 function boutonEcouter(texte, libelle = "🔊 Écouter") {
   const b = el("button", "ecouter petit", libelle);
@@ -156,12 +179,97 @@ function texteEnonce(ex) {
   return texte;
 }
 
-$("ecouter-lecon").addEventListener("click", (e) => lire(texteLecon(etat.chapitre), e.currentTarget));
+// --- Le cours de la maîtresse ----------------------------------------------------
+// L'IA prépare une vraie explication orale de la leçon (gardée par le serveur),
+// dite avec la voix choisie ; les sous-titres suivent sa parole.
+
+async function coursDeLaMaitresse(bouton) {
+  if (boutonEnCours === bouton) return arreterLecture();
+  const cours = $("cours");
+  const chapitre = etat.chapitre;
+  cours.hidden = false;
+  cours.replaceChildren(el("p", "cours-attente", "La maîtresse prépare son explication…"));
+  bouton.disabled = true;
+  try {
+    const r = await api("/explication", { chapitre: chapitre.id });
+    if (etat.chapitre !== chapitre) return;
+    const lignes = r.paragraphes.map((p) => el("p", null, p));
+    cours.replaceChildren(el("p", "cours-titre", "👩‍🏫 La maîtresse t'explique"), ...lignes);
+    bouton.disabled = false;
+    dire(r.paragraphes, bouton, (i) => {
+      lignes.forEach((l, j) => l.classList.toggle("en-cours", i === j));
+      lignes[i].scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  } catch (err) {
+    bouton.disabled = false;
+    cours.replaceChildren(el("p", "cours-attente", err.statut === 503
+      ? "La maîtresse a besoin de la clé OpenAI pour faire son cours. En attendant, je te lis la leçon."
+      : err.message));
+    if (err.statut === 503) lire(texteLecon(chapitre), bouton);
+  }
+}
+
+$("ecouter-lecon").addEventListener("click", (e) => coursDeLaMaitresse(e.currentTarget));
 $("ecouter-enonce").addEventListener("click", (e) => lire(texteEnonce(etat.exercice), e.currentTarget));
-$("ecouter-correction").addEventListener("click", (e) =>
-  lire(`${$("retour-reponse").textContent}\n${$("correction-texte").textContent}`, e.currentTarget));
 $("ecouter-autrement").addEventListener("click", (e) => lire($("autrement-texte").textContent, e.currentTarget));
 window.addEventListener("hashchange", arreterLecture);
+
+// --- Le micro : poser sa question à voix haute -------------------------------------
+
+const micro = { enregistreur: null, morceaux: [], minuterie: null };
+
+function typeAudioPossible() {
+  if (!window.MediaRecorder) return null;
+  return ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].find((t) => MediaRecorder.isTypeSupported(t)) || "";
+}
+
+async function basculerMicro() {
+  const bouton = $("micro");
+  if (micro.enregistreur) {
+    micro.enregistreur.stop();
+    return;
+  }
+  arreterLecture();
+  let flux;
+  try {
+    flux = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    etat.fil.push({ role: "assistant", content: "Je n'ai pas accès au micro. Autorise-le dans le navigateur, ou écris ta question.", erreur: true });
+    return dessinerFil();
+  }
+  const type = typeAudioPossible();
+  micro.enregistreur = new MediaRecorder(flux, type ? { mimeType: type } : undefined);
+  micro.morceaux = [];
+  micro.enregistreur.ondataavailable = (e) => e.data.size && micro.morceaux.push(e.data);
+  micro.enregistreur.onstop = async () => {
+    clearTimeout(micro.minuterie);
+    flux.getTracks().forEach((t) => t.stop());
+    const audio = new Blob(micro.morceaux, { type: micro.enregistreur.mimeType || "audio/webm" });
+    micro.enregistreur = null;
+    bouton.classList.remove("en-cours");
+    bouton.textContent = "🎤 Parler";
+    if (audio.size < 1000) return;
+    bouton.disabled = true;
+    try {
+      const r = await fetch(`${API}/ecoute`, { method: "POST", credentials: "same-origin",
+                                                headers: { "Content-Type": audio.type }, body: audio });
+      const donnees = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(donnees.erreur || "Je n'ai pas réussi à t'entendre.");
+      await demanderTuteur(donnees.texte);
+    } catch (err) {
+      etat.fil.push({ role: "assistant", content: err.message, erreur: true });
+      dessinerFil();
+    } finally {
+      bouton.disabled = false;
+    }
+  };
+  micro.enregistreur.start();
+  micro.minuterie = setTimeout(() => micro.enregistreur?.stop(), 45000);
+  bouton.classList.add("en-cours");
+  bouton.textContent = "⏹ J'ai fini";
+}
+
+$("micro").addEventListener("click", basculerMicro);
 
 // --- Connexion ----------------------------------------------------------
 
@@ -326,12 +434,19 @@ async function demanderTuteur(question) {
   bouton.disabled = true;
   try {
     const r = await api("/tuteur", { chapitre: etat.chapitre.id, question, historique });
-    etat.fil.push({ role: "assistant", content: r.reponse });
+    etat.fil.push({ role: "assistant", content: r.reponse, dire: true });
   } catch (err) {
     etat.fil.push({ role: "assistant", content: err.message, erreur: true });
   } finally {
     bouton.disabled = false;
     dessinerFil();
+    // La maîtresse répond à voix haute
+    const derniere = etat.fil[etat.fil.length - 1];
+    if (derniere?.dire) {
+      derniere.dire = false;
+      const boutons = $("fil").querySelectorAll(".bulle.ia .ecouter");
+      if (boutons.length) lire(derniere.content, boutons[boutons.length - 1]);
+    }
   }
 }
 
@@ -518,6 +633,7 @@ $("pas-compris").addEventListener("click", async () => {
   try {
     const r = await api("/autrement", { id: etat.exercice.id });
     $("autrement-texte").textContent = r.reponse;
+    lire(r.reponse, $("ecouter-autrement"));
   } catch (err) {
     $("autrement-texte").textContent = err.message;
     bouton.disabled = false;
@@ -602,6 +718,15 @@ async function afficherSuivi() {
     return tr;
   }));
 
+  $("choix-voix").replaceChildren(...(s.voix_disponibles || []).map((v) => {
+    const o = el("option", null, v.charAt(0).toUpperCase() + v.slice(1) + (v === s.voix_choisie ? " (choisie)" : ""));
+    o.value = v;
+    o.selected = v === s.voix_choisie;
+    return o;
+  }));
+  $("essayer-voix").disabled = $("garder-voix").disabled = !s.voix;
+  if (!s.voix) $("message-voix").textContent = "Ajoutez la clé OpenAI (ECOLE_OPENAI_API_KEY) pour avoir la voix naturelle.";
+
   const coranSuivi = $("suivi-coran");
   coranSuivi.replaceChildren(...(s.coran || []).map((c) => {
     const li = el("li", null, `${c.numero}. ${c.nom} : ${c.versets_appris} verset${c.versets_appris > 1 ? "s" : ""} sur ${c.versets}` +
@@ -634,6 +759,36 @@ $("form-classe").addEventListener("submit", async (e) => {
   } catch (err) {
     message.className = "message";
     message.textContent = err.message;
+  }
+});
+
+$("essayer-voix").addEventListener("click", async (e) => {
+  const voixEssayee = $("choix-voix").value;
+  const bouton = e.currentTarget;
+  arreterLecture();
+  try {
+    const r = await api("/voix", { voix: voixEssayee, texte: `Bonjour ${etat.prenom} ! Je suis ta maîtresse. `
+      + "Aujourd'hui, on va découvrir les fractions ensemble. Tu es prêt ? C'est parti !" });
+    const jeton = {};
+    lectureEnCours = jeton;
+    boutonEnCours = bouton;
+    bouton.classList.add("en-cours");
+    await jouer(r.audio, jeton);
+    if (lectureEnCours === jeton) arreterLecture();
+  } catch (err) {
+    $("message-voix").textContent = err.message;
+  }
+});
+
+$("garder-voix").addEventListener("click", async () => {
+  try {
+    const r = await api("/reglage-voix", { voix: $("choix-voix").value });
+    $("message-voix").className = "message ok";
+    $("message-voix").textContent = `C'est fait : la maîtresse parle maintenant avec la voix « ${r.voix} ».`;
+    await afficherSuivi();
+  } catch (err) {
+    $("message-voix").className = "message";
+    $("message-voix").textContent = err.message;
   }
 });
 

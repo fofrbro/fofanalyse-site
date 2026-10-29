@@ -1,6 +1,8 @@
 """
-La maîtresse virtuelle : elle lit à voix haute les leçons, les énoncés, les
-corrections et les réponses du tuteur, avec la synthèse vocale d'OpenAI.
+La voix de la maîtresse virtuelle (synthèse vocale d'OpenAI) et son oreille
+(transcription de ce que dit l'enfant). Ce que la maîtresse dit est écrit
+par le tuteur IA (tuteur.py) : explication de la leçon, réponses aux
+questions, explications d'une correction. Ici, on ne fait que le dire.
 
 - Le texte est d'abord réécrit pour l'oral (« 47 × 23 » → « 47 fois 23 »,
   « 3/4 » → « 3 quarts », « cm² » → « centimètres carrés »).
@@ -19,6 +21,13 @@ import urllib.request
 from pathlib import Path
 
 URL_VOIX = "https://api.openai.com/v1/audio/speech"
+URL_TRANSCRIPTION = "https://api.openai.com/v1/audio/transcriptions"
+MAX_AUDIO_ENFANT = 1_500_000  # environ une minute d'enregistrement
+
+# Voix proposées au parent dans « Suivi » (il peut les écouter avant de choisir).
+VOIX_DISPONIBLES = ["coral", "sage", "shimmer", "nova", "ballad", "alloy", "verse"]
+TYPES_AUDIO = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "mp4", "audio/mpeg": "mp3",
+               "audio/wav": "wav", "audio/x-m4a": "m4a"}
 MAX_TEXTE = 1500
 MAX_FICHIERS = 3000  # au-delà, les audios les plus anciens sont effacés
 NOM_AUDIO = re.compile(r"^[0-9a-f]{64}$")
@@ -70,9 +79,11 @@ class VoixIndisponible(Exception):
 
 
 class Voix:
-    def __init__(self, cle: str | None, modele: str, voix: str, dossier: str):
+    def __init__(self, cle: str | None, modele: str, voix: str, dossier: str,
+                 modele_transcription: str = "gpt-4o-mini-transcribe"):
         self.cle = cle
         self.modele = modele
+        self.modele_transcription = modele_transcription
         self.voix = voix
         self.dossier = Path(dossier)
 
@@ -80,8 +91,8 @@ class Voix:
     def active(self) -> bool:
         return bool(self.cle)
 
-    def nom(self, texte: str, age: int) -> str:
-        return hashlib.sha256(json.dumps([self.modele, self.voix, age, texte]).encode()).hexdigest()
+    def nom(self, texte: str, age: int, voix: str | None = None) -> str:
+        return hashlib.sha256(json.dumps([self.modele, voix or self.voix, age, texte, 2]).encode()).hexdigest()
 
     def chemin(self, nom: str) -> Path | None:
         if not NOM_AUDIO.match(nom):
@@ -93,20 +104,24 @@ class Voix:
         return bool(chemin and chemin.exists())
 
     def consignes(self, age: int) -> str:
-        return (f"Tu es une maîtresse d'école française, chaleureuse et calme, qui parle à un enfant de {age} ans. "
-                "Parle lentement et articule bien, surtout les nombres. Ton encourageant, jamais moqueur. "
-                "Prononce les mots anglais avec un bon accent anglais, et l'arabe en arabe standard, "
-                "en articulant chaque lettre.")
+        return (f"Tu es une vraie maîtresse d'école française qui fait cours à un enfant de {age} ans, assis à côté de toi. "
+                "Parle de façon naturelle et vivante, comme une personne et non comme une machine qui lit : "
+                "intonation expressive, sourire dans la voix, petites pauses entre les idées, "
+                "un peu plus lentement et en appuyant sur les mots importants et sur les nombres. "
+                "Quand tu poses une question, laisse-la vraiment sonner comme une question. "
+                "Ton chaleureux et encourageant, jamais moqueur ni enfantin à l'excès. "
+                "Les mots anglais se prononcent avec un bon accent anglais ; l'arabe, en arabe standard bien articulé.")
 
-    def generer(self, texte: str, age: int) -> str:
+    def generer(self, texte: str, age: int, voix: str | None = None) -> str:
         """Crée l'audio s'il n'existe pas encore. Renvoie son nom."""
-        nom = self.nom(texte, age)
+        voix = voix or self.voix
+        nom = self.nom(texte, age, voix)
         chemin = self.chemin(nom)
         if chemin.exists():
             return nom
         requete = urllib.request.Request(
             URL_VOIX, method="POST",
-            data=json.dumps({"model": self.modele, "voice": self.voix, "input": texte,
+            data=json.dumps({"model": self.modele, "voice": voix, "input": texte,
                              "instructions": self.consignes(age), "response_format": "mp3"}).encode(),
             headers={"Authorization": f"Bearer {self.cle}", "Content-Type": "application/json"})
         try:
@@ -123,6 +138,24 @@ class Voix:
         self.nettoyer()
         return nom
 
+    def transcrire(self, audio: bytes, type_mime: str) -> str:
+        """Ce que l'enfant a dit au micro, en texte (pour le poser au tuteur)."""
+        extension = TYPES_AUDIO.get(type_mime.split(";")[0].strip(), "webm")
+        limite = "----ecole" + hashlib.sha256(audio[:64]).hexdigest()[:16]
+        morceaux = []
+        for nom, valeur in (("model", self.modele_transcription), ("language", "fr"), ("response_format", "json")):
+            morceaux.append(f'--{limite}\r\nContent-Disposition: form-data; name="{nom}"\r\n\r\n{valeur}\r\n'.encode())
+        morceaux.append(f'--{limite}\r\nContent-Disposition: form-data; name="file"; filename="question.{extension}"\r\n'
+                        f'Content-Type: {type_mime.split(";")[0]}\r\n\r\n'.encode() + audio + b"\r\n")
+        morceaux.append(f"--{limite}--\r\n".encode())
+        requete = urllib.request.Request(URL_TRANSCRIPTION, method="POST", data=b"".join(morceaux), headers={
+            "Authorization": f"Bearer {self.cle}", "Content-Type": f"multipart/form-data; boundary={limite}"})
+        try:
+            with urllib.request.urlopen(requete, timeout=60) as r:
+                return json.loads(r.read()).get("text", "").strip()
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
+            raise VoixIndisponible(str(e)) from e
+
     def nettoyer(self):
         fichiers = sorted(self.dossier.glob("*.mp3"), key=lambda f: f.stat().st_mtime)
         for f in fichiers[:max(0, len(fichiers) - MAX_FICHIERS)]:
@@ -135,4 +168,5 @@ def depuis_environnement(db: str) -> Voix:
         modele=os.environ.get("ECOLE_VOIX_MODELE", "gpt-4o-mini-tts"),
         voix=os.environ.get("ECOLE_VOIX", "coral"),
         dossier=os.environ.get("ECOLE_VOIX_DOSSIER", str(Path(db).parent / "voix")),
+        modele_transcription=os.environ.get("ECOLE_TRANSCRIPTION_MODELE", "gpt-4o-mini-transcribe"),
     )
