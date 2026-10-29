@@ -1,4 +1,4 @@
-// Mon cahier de maths : l'espace de révision, du CM1 à la 6e.
+// Mon cahier : l'espace de révision (maths et français), du CM1 à la 6e.
 // Le serveur (ecole-service) tire les exercices, vérifie les réponses et
 // garde la progression ; le tuteur IA explique. Ici, seulement l'affichage.
 // Script externe, sans style en ligne : compatible avec la CSP du site.
@@ -11,10 +11,21 @@ const etat = {
   role: null, prenom: "", tuteur: false, voix: false,
   classe: "", classes: [],   // classe choisie par le parent, et toutes les classes
   chapitres: [], progres: {}, // chapitres de la classe et des classes d'avant
+  matieres: {}, matiere: lireMemoire("matiere") || "maths",  // onglet choisi sur l'accueil
   chapitre: null,            // chapitre ouvert
   fil: [],                   // conversation avec le tuteur (chapitre ouvert)
   serie: [], position: 0, justes: 0, exercice: null,
 };
+
+function lireMemoire(cle) {
+  try { return localStorage.getItem(`ecole-${cle}`); } catch { return null; }
+}
+
+function ecrireMemoire(cle, valeur) {
+  try { localStorage.setItem(`ecole-${cle}`, valeur); } catch { /* navigation privée : tant pis */ }
+}
+
+const ACCENTS = ["é", "è", "ê", "à", "â", "ç", "ù", "û", "î", "ï", "ô", "ë"];
 
 const SUGGESTIONS = [
   "Tu peux me réexpliquer avec un exemple ?",
@@ -179,7 +190,9 @@ $("sortir").addEventListener("click", async () => {
 
 async function chargerProgramme() {
   const r = await api("/programme");
-  Object.assign(etat, { chapitres: r.chapitres, progres: r.progres, classe: r.classe, classes: r.classes });
+  Object.assign(etat, { chapitres: r.chapitres, progres: r.progres, classe: r.classe, classes: r.classes,
+                        matieres: r.matieres });
+  if (!etat.matieres[etat.matiere]) etat.matiere = "maths";
   etoilesTotal();
 }
 
@@ -190,7 +203,7 @@ function titreChapitre(c) {
 function chapitreConseille() {
   // Dans la classe en cours : le moins travaillé d'abord ; à égalité, celui où il réussit le moins.
   let meilleur = null, note = Infinity;
-  for (const c of etat.chapitres.filter((x) => x.classe === etat.classe)) {
+  for (const c of etat.chapitres.filter((x) => x.classe === etat.classe && x.matiere === etat.matiere)) {
     const p = etat.progres[c.id];
     const taux = p.faits ? p.etoiles / p.faits : 0;
     const score = (p.faits >= 8 ? 1 : 0) * 10 + taux + p.niveau;
@@ -211,7 +224,16 @@ function afficherAccueil() {
     $("conseil-lien").href = `#${conseil.id}`;
     $("conseil").hidden = false;
   }
-  const actuels = etat.chapitres.filter((c) => c.classe === etat.classe);
+  $("onglets").replaceChildren(...Object.entries(etat.matieres).map(([id, nom]) => {
+    const b = el("button", "onglet", nom);
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", String(id === etat.matiere));
+    b.addEventListener("click", () => { etat.matiere = id; ecrireMemoire("matiere", id); afficherAccueil(); });
+    return b;
+  }));
+  const deLaMatiere = etat.chapitres.filter((c) => c.matiere === etat.matiere);
+  const actuels = deLaMatiere.filter((c) => c.classe === etat.classe);
   const zone = $("domaines");
   zone.replaceChildren();
   for (const d of [...new Set(actuels.map((c) => c.domaine))]) {
@@ -226,7 +248,8 @@ function afficherAccueil() {
     const bloc = el("details", "revisions");
     bloc.append(el("summary", null, `Réviser ${avant.length > 1 ? "les années d'avant" : `le ${avant[0]}`}`));
     for (const classe of avant.reverse()) {
-      bloc.append(el("h3", null, classe), grilleChapitres(etat.chapitres.filter((c) => c.classe === classe)));
+      if (avant.length > 1) bloc.append(el("h3", null, classe));
+      bloc.append(grilleChapitres(deLaMatiere.filter((c) => c.classe === classe)));
     }
     revisions.append(bloc);
   }
@@ -253,7 +276,9 @@ function afficherChapitre(c) {
   if (etat.chapitre?.id !== c.id) etat.fil = [];
   etat.chapitre = c;
   const p = etat.progres[c.id];
-  $("chap-domaine").textContent = c.classe === etat.classe ? c.domaine : `Révision ${c.classe} · ${c.domaine}`;
+  const matiere = etat.matieres[c.matiere] || "";
+  $("chap-domaine").textContent = c.classe === etat.classe ? `${matiere} · ${c.domaine}`
+    : `Révision ${c.classe} · ${matiere} · ${c.domaine}`;
   $("chap-titre").textContent = c.titre;
   $("chap-resume").textContent = c.resume;
   $("chap-niveau").textContent = `Niveau ${p.niveau} sur 3 · ${p.faits} exercice${p.faits > 1 ? "s" : ""} fait${p.faits > 1 ? "s" : ""}`;
@@ -364,9 +389,14 @@ function afficherExercice() {
     const champs = ex.type === "multi" ? ex.champs : [{ label: ex.unite || "" }];
     champs.forEach((c, i) => {
       const bloc = el("span", "champ");
-      const input = el("input", ex.type === "multi" ? "petit" : "");
+      const input = el("input", ex.type === "multi" ? "petit" : ex.type === "texte" ? "mot" : "");
       input.type = "text";
-      input.inputMode = "decimal";
+      if (ex.type === "texte") {
+        Object.assign(input, { spellcheck: false, autocapitalize: "off" });
+        input.setAttribute("autocorrect", "off");
+      } else {
+        input.inputMode = "decimal";
+      }
       input.autocomplete = "off";
       input.id = `rep-${i}`;
       input.setAttribute("aria-label", c.label || "Ta réponse");
@@ -377,6 +407,7 @@ function afficherExercice() {
     const verifier = el("button", "bouton", "Vérifier");
     verifier.type = "submit";
     form.append(verifier);
+    if (ex.type === "texte") form.append(clavierAccents());
     setTimeout(() => $("rep-0")?.focus(), 50);
   }
 
@@ -389,6 +420,25 @@ function afficherExercice() {
   $("autrement").hidden = true;
   $("boutons-suite").hidden = true;
   $("pas-compris").disabled = false;
+}
+
+function clavierAccents() {
+  // Des lettres accentuées à portée de doigt : sur un clavier d'ordinateur, elles ne sont pas toujours faciles.
+  const rangee = el("div", "accents");
+  for (const lettre of ACCENTS) {
+    const b = el("button", "accent", lettre);
+    b.type = "button";
+    b.setAttribute("aria-label", `Ajouter ${lettre}`);
+    b.addEventListener("click", () => {
+      const champ = $("rep-0");
+      const debut = champ.selectionStart ?? champ.value.length, fin = champ.selectionEnd ?? debut;
+      champ.value = champ.value.slice(0, debut) + lettre + champ.value.slice(fin);
+      champ.focus();
+      champ.setSelectionRange(debut + 1, debut + 1);
+    });
+    rangee.append(b);
+  }
+  return rangee;
 }
 
 $("voir-indice").addEventListener("click", () => {

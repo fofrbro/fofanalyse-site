@@ -1,6 +1,6 @@
 """
-Service « École » de fofanalyse.com : l'espace de révision de maths, du CM1
-à la 6e. Le parent choisit la classe dans le suivi ; les chapitres des
+Service « École » de fofanalyse.com : l'espace de révision (maths et
+français), du CM1 à la 6e. Le parent choisit la classe dans le suivi ; les chapitres des
 classes d'avant restent ouverts pour réviser.
 
 Servi par Caddy sous https://fofanalyse.com/api/ecole/ ; la page est dans
@@ -124,8 +124,11 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None) -> Starlette
         return {"role": role, "prenom": config.prenom, "tuteur": tuteur.actif, "voix": voix.active,
                 "classe": classe()}
 
-    def pour_tuteur() -> dict:
-        return {"classe": classe(), "age": lecons.CLASSES[classe()]["age"]}
+    def pour_tuteur(chapitre=None) -> dict:
+        infos = {"classe": classe(), "age": lecons.CLASSES[classe()]["age"]}
+        if chapitre:
+            infos["matiere"] = lecons.MATIERES[lecons.PAR_ID[chapitre]["matiere"]]
+        return infos
 
     async def corps_json(request: Request) -> dict | None:
         if "application/json" not in request.headers.get("content-type", ""):
@@ -190,7 +193,8 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None) -> Starlette
     @protege()
     async def programme(request: Request):
         chapitres = lecons.chapitres_jusqua(classe())
-        return JSONResponse({"classe": classe(), "classes": list(lecons.CLASSES), "chapitres": chapitres,
+        return JSONResponse({"classe": classe(), "classes": list(lecons.CLASSES), "matieres": lecons.MATIERES,
+                             "chapitres": chapitres,
                              "progres": stock.progres_eleve([c["id"] for c in chapitres])})
 
     @protege()
@@ -219,7 +223,7 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None) -> Starlette
         if isinstance(reponse_eleve, list):
             reponse_eleve = [str(r)[:20] for r in reponse_eleve[:8]]
         else:
-            reponse_eleve = str(reponse_eleve or "")[:40]
+            reponse_eleve = str(reponse_eleve or "")[:60]
         ex = ligne["donnees"]
         correct = E.verifier(ex, reponse_eleve)
         etat = stock.noter_essai(ligne["id"], correct, reponse_eleve)
@@ -260,7 +264,7 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None) -> Starlette
             return JSONResponse({"reponse": REPONSE_BLOQUEE})
         stock.noter_question(chapitre, question)
         return await appeler_tuteur(tuteur.repondre, lecons.lecon_en_texte(chapitre), question, historique,
-                                    **pour_tuteur())
+                                    **pour_tuteur(chapitre))
 
     @protege()
     async def autrement(request: Request):
@@ -270,7 +274,7 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None) -> Starlette
             return erreur("Termine d'abord l'exercice.", 409)
         reponse_eleve = json.loads(ligne["derniere_reponse"] or '""')
         return await appeler_tuteur(tuteur.reexpliquer, lecons.lecon_en_texte(ligne["chapitre"]),
-                                    ligne["donnees"], reponse_eleve, **pour_tuteur())
+                                    ligne["donnees"], reponse_eleve, **pour_tuteur(ligne["chapitre"]))
 
     # --- Maîtresse virtuelle (voix) ---------------------------------------------
 

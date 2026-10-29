@@ -1,7 +1,8 @@
 """
-Le catalogue des générateurs d'exercices, toutes classes réunies, et le
-tirage d'une série. Les générateurs sont dans exercices.py (CM1 et outils
-communs), exercices_cm2.py et exercices_6e.py.
+Le catalogue des générateurs d'exercices, toutes classes et matières
+réunies, et le tirage d'une série. Les générateurs sont dans exercices.py
+(maths de CM1 et outils communs), exercices_cm2.py, exercices_6e.py et
+francais.py.
 """
 
 import random
@@ -9,8 +10,10 @@ import random
 import exercices
 import exercices_6e
 import exercices_cm2
+import francais
 
-GENERATEURS = {**exercices.GENERATEURS, **exercices_cm2.GENERATEURS, **exercices_6e.GENERATEURS}
+GENERATEURS = {**exercices.GENERATEURS, **exercices_cm2.GENERATEURS, **exercices_6e.GENERATEURS,
+               **francais.GENERATEURS}
 
 
 def generer(chapitre: str, niveau: int, rng: random.Random | None = None, prenom: str = "Mouaz") -> dict:

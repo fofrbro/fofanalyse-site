@@ -1,7 +1,7 @@
-# Espace de révision du CM1 à la 6e (« Mon cahier de maths »)
+# Espace de révision du CM1 à la 6e (« Mon cahier »)
 
-`https://fofanalyse.com/ecole/` : un espace privé où Mouaz révise les maths de
-sa classe (CM1, CM2 ou 6e). Pour chaque chapitre : une leçon courte, des séries de 8 exercices
+`https://fofanalyse.com/ecole/` : un espace privé où Mouaz révise les maths et
+le français de sa classe (CM1, CM2 ou 6e). Pour chaque chapitre : une leçon courte, des séries de 8 exercices
 interactifs qui s'adaptent à son niveau, une correction pas à pas, et un
 tuteur IA qui réexplique quand il ne comprend pas. Le parent voit le suivi.
 
@@ -13,10 +13,12 @@ la bonne réponse :
 | Qui | Fait quoi |
 |---|---|
 | `exercices.py`, `exercices_cm2.py`, `exercices_6e.py` | tirent chaque exercice au hasard, le résolvent (Decimal pour les virgules), écrivent la correction étape par étape |
+| `conjugaison.py` | calcule les formes des verbes (1er et 2e groupes, 15 irréguliers, 8 temps, accord avec « être ») |
+| `francais.py`, `francais_banques.py` | exercices de français : conjugaison et accords calculés, grammaire, homophones et vocabulaire tirés de banques vérifiées à la main |
 | `catalogue.py` | réunit les générateurs de toutes les classes et tire une série |
 | `stockage.py` | garde la classe choisie, les réponses et le niveau de chaque chapitre (SQLite) |
 | `tuteur.py` | réexplique *autrement*, en recevant la leçon, la bonne réponse calculée et la réponse de l'enfant ; il connaît sa classe et son âge |
-| `lecons.py`, `lecons_cm2.py`, `lecons_6e.py` | les leçons, classe par classe, affichées sur la page et données au tuteur comme référence (à la manière d'un RAG) |
+| `lecons.py`, `lecons_cm2.py`, `lecons_6e.py`, `lecons_francais.py` | les leçons, classe par classe, affichées sur la page et données au tuteur comme référence (à la manière d'un RAG) |
 
 ## Classes et chapitres
 
@@ -36,6 +38,22 @@ ranger, × 0,1), calculer avec des décimaux (produit, division, ordre des
 calculs), multiples et diviseurs (critères, division euclidienne), fractions
 (quotient, fractions égales, simplifier, additionner), proportionnalité
 (pourcentages, échelles), cercle, aires et volumes, angles, problèmes.
+
+**Français** (6 chapitres par classe, onglet « Français » sur l'accueil) —
+CM1 : présent, futur et imparfait, passé composé, classes de mots,
+homophones (a/à, et/est, son/sont, on/ont, ou/où), accords dans le groupe
+nominal. CM2 : temps simples (dont passé simple et conditionnel), temps
+composés, fonctions, homophones (ce/se, ces/ses, c'est/s'est, leur/leurs,
+la/l'a/là), participe passé (-é/-er, accord avec être), vocabulaire. 6e :
+conjugaison à tous les temps, classes de mots (adverbe, préposition,
+conjonction), fonctions (épithète, complément du nom), la phrase, accords
+du participe passé, vocabulaire (sens propre ou figuré, niveaux de langue).
+
+Les réponses s'écrivent au clavier : les accents comptent (c'est de
+l'orthographe), pas la casse ni le point final. Une rangée de lettres
+accentuées aide à les taper. Les verbes à radical changeant (acheter,
+appeler, préférer, payer…) ne sont pas proposés : le moteur ne les couvre
+pas, plutôt que de risquer une forme fausse.
 
 **Changer de classe** : le parent choisit la classe dans « Suivi » (rien à
 redéployer). `ECOLE_CLASSE` ne sert qu'au tout premier démarrage. Les

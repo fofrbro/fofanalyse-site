@@ -33,7 +33,7 @@ DENOMINATEURS = {2: ("demi", "demis"), 3: ("tiers", "tiers"), 4: ("quart", "quar
 SYMBOLES = [
     ("×", " fois "), ("+", " plus "), ("÷", " divisé par "), ("−", " moins "), ("≈", " environ "), ("≤", " inférieur ou égal à "),
     ("≥", " supérieur ou égal à "), ("<", " plus petit que "), (">", " plus grand que "), ("=", " égale "),
-    ("→", ", "), ("✓", ""), ("★", ""), ("…", " combien "), ("°", " degrés"), ("%", " pour cent"), ("π", " pi "),
+    ("→", ", "), ("✓", ""), ("★", ""), ("°", " degrés"), ("%", " pour cent"), ("π", " pi "),
 ]
 
 
@@ -55,6 +55,10 @@ def pour_la_voix(texte: str) -> str:
         t = re.sub(rf"(?<![A-Za-zé]){unite}", mots, t)
     t = re.sub(r"(?<![\d,])(\d+)/(\d+)", fraction_orale, t)
     t = re.sub(r"…/(\d+)", r"combien sur \1", t)
+    # « … » dans un calcul : une case à trouver ; ailleurs (« nous … ») : un simple silence
+    t = re.sub(r"(?<=[=×+−÷<>]) ?…|…(?= ?[=×+−÷<>])", " combien ", t)
+    t = t.replace("…", "…, ")
+    t = t.replace("___", "…, ")
     for symbole, mots in SYMBOLES:
         t = t.replace(symbole, mots)
     t = re.sub(r"\.\s*\.", ".", t)
