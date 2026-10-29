@@ -194,6 +194,18 @@ Puis, dans un navigateur :
 curl -s https://fofanalyse.com/api/ecole/health
 ```
 
+Coran : à la première ouverture de l'onglet « Coran », le serveur télécharge
+le texte et la traduction depuis `api.alquran.cloud`, puis chaque récitation
+depuis `everyayah.com` à la première écoute. Le serveur doit donc pouvoir
+joindre ces deux sites. Pour télécharger le texte tout de suite et vérifier
+que tout va bien :
+
+```bash
+docker compose exec ecole python -c "import coran; d = coran.depuis_environnement('/data/ecole.db').texte(); print(len(d['sourates']), 'sourates')"
+```
+
+La réponse attendue est `38 sourates`.
+
 La progression est dans le volume Docker `deploy_ecole_data`. Sauvegarde :
 
 ```bash

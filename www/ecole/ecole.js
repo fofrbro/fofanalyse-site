@@ -225,6 +225,8 @@ function afficherAccueil() {
     $("conseil-lien").href = `#${conseil.id}`;
     $("conseil").hidden = false;
   }
+  const ongletCoran = el("a", "onglet", "Coran");
+  ongletCoran.href = "#coran";
   $("onglets").replaceChildren(...Object.entries(etat.matieres).map(([id, nom]) => {
     const b = el("button", "onglet", nom);
     b.type = "button";
@@ -232,7 +234,7 @@ function afficherAccueil() {
     b.setAttribute("aria-selected", String(id === etat.matiere));
     b.addEventListener("click", () => { etat.matiere = id; ecrireMemoire("matiere", id); afficherAccueil(); });
     return b;
-  }));
+  }), ongletCoran);
   const deLaMatiere = etat.chapitres.filter((c) => c.matiere === etat.matiere);
   const actuels = deLaMatiere.filter((c) => c.classe === etat.classe);
   const zone = $("domaines");
@@ -600,6 +602,15 @@ async function afficherSuivi() {
     return tr;
   }));
 
+  const coranSuivi = $("suivi-coran");
+  coranSuivi.replaceChildren(...(s.coran || []).map((c) => {
+    const li = el("li", null, `${c.numero}. ${c.nom} : ${c.versets_appris} verset${c.versets_appris > 1 ? "s" : ""} sur ${c.versets}` +
+      (c.versets_appris >= c.versets ? " ✓" : ""));
+    li.append(el("span", "meta", `Dernier progrès : ${new Date(c.maj * 1000).toLocaleDateString("fr-FR")}`));
+    return li;
+  }));
+  if (!(s.coran || []).length) coranSuivi.append(el("li", null, "Pas encore commencé."));
+
   const liste = $("suivi-questions");
   liste.replaceChildren(...s.questions.map((q) => {
     const li = el("li", q.bloquee ? "bloquee" : "", q.question);
@@ -649,6 +660,225 @@ $("effacer").addEventListener("click", async () => {
   }
 });
 
+// --- Coran ------------------------------------------------------------------------
+// Le texte et les récitations viennent du serveur, qui les tient de sources de
+// référence (Tanzil, traduction Hamidullah, everyayah.com). Ici, rien n'est écrit
+// ni lu par la synthèse vocale : seule la voix des récitants est utilisée.
+
+const coran = { sourate: null, recitants: {}, sources: "", file: [], cache: false };
+const lecteurCoran = new Audio();
+
+function recitant() {
+  const choisi = lireMemoire("recitant");
+  return coran.recitants[choisi] ? choisi : "husary";
+}
+
+function audioVerset(sourate, verset) {
+  return `${API}/coran/audio/${recitant()}/${sourate}/${verset}`;
+}
+
+function jouerFile(versets, repetitions = 1) {
+  // versets : liste de numéros (0 = basmala), joués à la suite, chacun « repetitions » fois.
+  arreterLecture();
+  coran.file = versets.flatMap((v) => Array(repetitions).fill(v));
+  jouerSuivant();
+}
+
+function jouerSuivant() {
+  const v = coran.file.shift();
+  if (v === undefined) return marquerVerset(null);
+  marquerVerset(v);
+  lecteurCoran.src = audioVerset(coran.sourate.numero, v);
+  lecteurCoran.play().catch(() => {
+    $("sourate-progres").textContent = "La récitation n'a pas pu être chargée. Réessaie dans un moment.";
+  });
+}
+
+function arreterCoran() {
+  coran.file = [];
+  lecteurCoran.pause();
+  marquerVerset(null);
+}
+
+lecteurCoran.addEventListener("ended", jouerSuivant);
+lecteurCoran.addEventListener("error", () => { coran.file = []; marquerVerset(null); });
+
+function marquerVerset(v) {
+  for (const carte of document.querySelectorAll("#versets .verset")) {
+    carte.classList.toggle("focus", Number(carte.dataset.n) === v);
+  }
+}
+
+function carteVerset(verset, avecBoutons = true) {
+  const carte = el("div", "verset");
+  carte.dataset.n = verset.n;
+  const arabe = el("p", "verset-arabe", verset.arabe);
+  arabe.dir = "rtl";
+  arabe.lang = "ar";
+  carte.append(arabe);
+  if ($("voir-traduction").checked) carte.append(el("p", "verset-fr", `${verset.n}. ${verset.francais}`));
+  if (avecBoutons) {
+    const bas = el("div", "verset-bas");
+    bas.append(el("span", "numero-verset", String(verset.n)));
+    for (const [libelle, fois] of [["▶ Écouter", 1], ["🔁 3 fois", 3]]) {
+      const b = el("button", "ecouter petit", libelle);
+      b.type = "button";
+      b.addEventListener("click", () => jouerFile([verset.n], fois));
+      bas.append(b);
+    }
+    carte.append(bas);
+  }
+  return carte;
+}
+
+async function afficherCoran() {
+  arreterCoran();
+  afficher("coran");
+  $("coran-message").textContent = "Chargement…";
+  try {
+    const r = await api("/coran");
+    Object.assign(coran, { recitants: r.recitants, sources: r.sources });
+    $("coran-message").textContent = "";
+    $("coran-sources").textContent = r.sources;
+    $("liste-sourates").replaceChildren(...r.sourates.map((s) => {
+      const a = el("a", "chapitre");
+      a.href = `#coran-${s.numero}`;
+      const nomArabe = el("span", "sourate-arabe", s.nom_arabe);
+      nomArabe.dir = "rtl";
+      nomArabe.lang = "ar";
+      const fini = s.appris >= s.versets;
+      a.append(el("span", "chapitre-titre", `${s.numero}. ${s.nom}`), nomArabe,
+               el("span", "chapitre-resume", `${s.versets} versets · ${fini ? "apprise ✓" : `${s.appris} appris`}`));
+      return a;
+    }));
+  } catch (err) {
+    $("coran-message").textContent = err.message;
+  }
+}
+
+async function afficherSourate(numero) {
+  arreterCoran();
+  if (!coran.sources) {
+    const r = await api("/coran");
+    Object.assign(coran, { recitants: r.recitants, sources: r.sources });
+  }
+  const s = await api(`/coran/${numero}`);
+  coran.sourate = s;
+  coran.cache = false;
+  $("sourate-surtitre").textContent = `Sourate ${s.numero}`;
+  $("sourate-titre").textContent = s.nom;
+  $("sourate-nom-arabe").textContent = s.nom_arabe;
+  $("sourate-sources").textContent = coran.sources;
+  $("choix-recitant").replaceChildren(...Object.entries(coran.recitants).map(([id, nom]) => {
+    const o = el("option", null, nom);
+    o.value = id;
+    o.selected = id === recitant();
+    return o;
+  }));
+  $("voir-traduction").checked = lireMemoire("traduction") === "oui";
+  dessinerSourate();
+  $("quiz-coran").replaceChildren();
+  $("quiz-coran-lancer").parentElement.hidden = s.versets.length < 3;
+  afficher("sourate");
+}
+
+function dessinerSourate() {
+  const s = coran.sourate;
+  $("sourate-progres").textContent = s.appris >= s.versets.length
+    ? `Tu connais toute la sourate ✓ Révise-la souvent pour ne pas l'oublier.`
+    : `Versets appris : ${s.appris} sur ${s.versets.length}.`;
+  $("versets").replaceChildren(...s.versets.map((v) => {
+    const carte = carteVerset(v);
+    carte.classList.toggle("appris", v.n <= s.appris);
+    return carte;
+  }));
+  dessinerProfesseur();
+}
+
+function versetEnCours() {
+  const s = coran.sourate;
+  return s.versets[Math.min(s.appris, s.versets.length - 1)];
+}
+
+function dessinerProfesseur() {
+  const s = coran.sourate;
+  const fini = s.appris >= s.versets.length;
+  const v = versetEnCours();
+  $("prof-consigne").textContent = fini
+    ? "Bravo ! Pour réviser, récite toute la sourate avec le récitant, puis seul."
+    : `Verset ${v.n} : écoute-le, répète-le, puis récite-le sans regarder.`;
+  const carte = carteVerset(v, false);
+  carte.classList.remove("focus");
+  if (coran.cache) carte.querySelector(".verset-arabe").classList.add("cache");
+  $("prof-verset").replaceChildren(...carte.childNodes);
+  $("prof-etapes").hidden = fini;
+  $("prof-cacher").textContent = coran.cache ? "Montrer le verset" : "3. Réciter sans regarder";
+}
+
+$("prof-ecouter3").addEventListener("click", () => jouerFile([versetEnCours().n], 3));
+$("prof-repeter").addEventListener("click", () => jouerFile([versetEnCours().n], 1));
+$("prof-cacher").addEventListener("click", () => { coran.cache = !coran.cache; dessinerProfesseur(); });
+$("prof-retenu").addEventListener("click", async () => {
+  const s = coran.sourate;
+  const appris = Math.min(s.appris + 1, s.versets.length);
+  try {
+    await api(`/coran/${s.numero}/progres`, { appris });
+    s.appris = appris;
+    coran.cache = false;
+    dessinerSourate();
+  } catch (err) {
+    $("prof-consigne").textContent = err.message;
+  }
+});
+$("prof-depuis-debut").addEventListener("click", () => {
+  const s = coran.sourate;
+  const jusqua = Math.max(1, Math.min(s.appris + 1, s.versets.length));
+  jouerFile([...(s.basmala ? [0] : []), ...s.versets.slice(0, jusqua).map((v) => v.n)]);
+});
+$("ecouter-sourate").addEventListener("click", () => {
+  const s = coran.sourate;
+  jouerFile([...(s.basmala ? [0] : []), ...s.versets.map((v) => v.n)]);
+});
+$("arreter-coran").addEventListener("click", arreterCoran);
+$("choix-recitant").addEventListener("change", (e) => { ecrireMemoire("recitant", e.target.value); arreterCoran(); });
+$("voir-traduction").addEventListener("change", (e) => {
+  ecrireMemoire("traduction", e.target.checked ? "oui" : "non");
+  dessinerSourate();
+});
+
+$("quiz-coran-lancer").addEventListener("click", () => {
+  // Les versets proposés sont ceux de la sourate, tels quels : rien n'est inventé.
+  const versets = coran.sourate.versets;
+  const i = Math.floor(Math.random() * (versets.length - 1));
+  const bonne = versets[i + 1];
+  const autres = versets.filter((v) => v.n !== bonne.n && v.n !== versets[i].n)
+    .sort(() => Math.random() - 0.5).slice(0, 2);
+  const options = [bonne, ...autres].sort(() => Math.random() - 0.5);
+  const zone = $("quiz-coran");
+  const consigne = el("p", "prof-consigne", `Après le verset ${versets[i].n} :`);
+  const debut = carteVerset(versets[i], false);
+  const liste = el("div", "options-versets");
+  for (const v of options) {
+    const b = el("button", "option-verset");
+    b.type = "button";
+    const arabe = el("p", "verset-arabe", v.arabe);
+    arabe.dir = "rtl";
+    arabe.lang = "ar";
+    b.append(arabe);
+    b.addEventListener("click", () => {
+      b.classList.add(v.n === bonne.n ? "bonne" : "fausse");
+      if (v.n === bonne.n) {
+        consigne.textContent = `Bravo ! C'est le verset ${bonne.n}.`;
+        jouerFile([bonne.n]);
+      } else {
+        consigne.textContent = "Ce n'est pas celui-là. Réécoute le verset et réessaie.";
+      }
+    });
+    liste.append(b);
+  }
+  zone.replaceChildren(consigne, debut, liste);
+});
+
 // --- Navigation (#accueil, #fractions, #suivi…) -------------------------------
 
 async function router() {
@@ -656,7 +886,10 @@ async function router() {
   const cible = location.hash.slice(1);
   const chapitre = etat.chapitres.find((c) => c.id === cible);
   try {
+    if (cible !== "coran" && !cible.startsWith("coran-")) arreterCoran();
     if (chapitre) afficherChapitre(chapitre);
+    else if (cible === "coran") await afficherCoran();
+    else if (/^coran-\d+$/.test(cible)) await afficherSourate(Number(cible.slice(6)));
     else if (cible === "suivi" && etat.role === "parent") await afficherSuivi();
     else { await chargerProgramme(); afficherAccueil(); }
   } catch (err) {

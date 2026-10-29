@@ -42,6 +42,7 @@ import catalogue
 import exercices as E
 import lecons
 from stockage import Stockage
+import coran as Q
 import voix as V
 from tuteur import REPONSE_BLOQUEE, TuteurIndisponible, depuis_environnement
 
@@ -98,10 +99,11 @@ def verifier_session(secret: str, valeur: str | None) -> dict | None:
     return contenu
 
 
-def creer_app(config: Config | None = None, tuteur=None, voix=None) -> Starlette:
+def creer_app(config: Config | None = None, tuteur=None, voix=None, coran=None) -> Starlette:
     config = config or Config()
     tuteur = tuteur or depuis_environnement()
     voix = voix or V.depuis_environnement(config.db)
+    coran = coran or Q.depuis_environnement(config.db)
     stock = Stockage(config.db)
     echecs = defaultdict(deque)  # adresse IP → instants des codes faux
 
@@ -305,6 +307,63 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None) -> Starlette
         return FileResponse(chemin, media_type="audio/mpeg",
                             headers={"Cache-Control": "private, max-age=2592000, immutable"})
 
+    # --- Coran ------------------------------------------------------------------
+    # Le texte et les récitations viennent de sources de référence (voir coran.py) ;
+    # rien n'est généré, et le tuteur IA n'intervient pas.
+
+    async def texte_coran():
+        try:
+            return await run_in_threadpool(coran.texte)
+        except Q.CoranIndisponible:
+            return None
+
+    @protege()
+    async def coran_sommaire(request: Request):
+        texte = await texte_coran()
+        if not texte:
+            return erreur("Le texte du Coran n'a pas encore pu être téléchargé par le serveur. Réessaie plus tard.", 503)
+        progres = stock.coran_progres()
+        return JSONResponse({
+            "sources": texte["sources"],
+            "recitants": {k: v["nom"] for k, v in Q.RECITANTS.items()},
+            "sourates": [{"numero": n, "nom": nom, "nom_arabe": texte["sourates"][str(n)]["nom_arabe"],
+                          "versets": total, "appris": progres.get(n, {}).get("versets_appris", 0)}
+                         for n, nom, total in Q.SOURATES],
+        })
+
+    @protege()
+    async def coran_sourate(request: Request):
+        texte = await texte_coran()
+        numero = request.path_params["numero"]
+        if not texte:
+            return erreur("Le texte du Coran n'est pas encore disponible.", 503)
+        if numero not in Q.PAR_NUMERO:
+            return erreur("Sourate inconnue.", 404)
+        return JSONResponse({**texte["sourates"][str(numero)], "texte_basmala": texte["basmala"],
+                             "appris": stock.coran_progres().get(numero, {}).get("versets_appris", 0)})
+
+    @protege()
+    async def coran_progresser(request: Request):
+        numero = request.path_params["numero"]
+        donnees = await corps_json(request) or {}
+        appris = donnees.get("appris")
+        if numero not in Q.PAR_NUMERO or not isinstance(appris, int) or not 0 <= appris <= Q.PAR_NUMERO[numero][2]:
+            return erreur("Progression invalide.")
+        stock.noter_coran(numero, appris)
+        return JSONResponse({"appris": appris})
+
+    @protege()
+    async def coran_audio(request: Request):
+        p = request.path_params
+        try:
+            chemin = await run_in_threadpool(coran.audio, p["recitant"], p["sourate"], p["verset"])
+        except ValueError:
+            return erreur("Verset inconnu.", 404)
+        except Q.CoranIndisponible:
+            return erreur("La récitation n'a pas pu être téléchargée. Réessaie dans un moment.", 502)
+        return FileResponse(chemin, media_type="audio/mpeg",
+                            headers={"Cache-Control": "private, max-age=2592000, immutable"})
+
     # --- Parent ------------------------------------------------------------------
 
     @protege("parent")
@@ -313,7 +372,10 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None) -> Starlette
         return JSONResponse({**stock.suivi_parent(ids), "plafond_ia": config.ia_par_jour, "tuteur": tuteur.actif,
                              "voix": voix.active, "appels_voix_aujourdhui": stock.appels_voix_aujourdhui(),
                              "plafond_voix": config.voix_par_jour,
-                             "classe": classe(), "classes": list(lecons.CLASSES)})
+                             "classe": classe(), "classes": list(lecons.CLASSES),
+                             "coran": [{"numero": n, "nom": nom, "versets": total, **progres}
+                                       for n, progres in sorted(stock.coran_progres().items())
+                                       for _, nom, total in [Q.PAR_NUMERO[n]]]})
 
     @protege("parent")
     async def changer_classe(request: Request):
@@ -347,6 +409,10 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None) -> Starlette
         Route(f"{p}/tuteur", poser_question, methods=["POST"]),
         Route(f"{p}/autrement", autrement, methods=["POST"]),
         Route(f"{p}/voix", lire_a_voix_haute, methods=["POST"]),
+        Route(f"{p}/coran", coran_sommaire),
+        Route(f"{p}/coran/{{numero:int}}", coran_sourate),
+        Route(f"{p}/coran/{{numero:int}}/progres", coran_progresser, methods=["POST"]),
+        Route(f"{p}/coran/audio/{{recitant}}/{{sourate:int}}/{{verset:int}}", coran_audio),
         Route(f"{p}/voix/{{nom}}", audio),
         Route(f"{p}/suivi", suivi),
         Route(f"{p}/classe", changer_classe, methods=["POST"]),

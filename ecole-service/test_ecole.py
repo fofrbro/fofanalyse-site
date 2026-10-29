@@ -507,3 +507,83 @@ def test_arabe_pour_toutes_les_classes(client):
         assert len(arabe) == 7 and all(c["classe"] == classe for c in arabe)
     serie = client.post("/api/ecole/serie", json={"chapitre": "ar-voyelles"}).json()
     assert all(e["arabe"] for e in serie["exercices"])
+
+
+# --- Coran (fausse API : textes factices, aucun vrai verset dans les tests) ---------------------------
+
+def fausse_api_coran(echec=False, versets_en_moins=0):
+    import coran as Q
+    basmala = "كلمة١ كلمة٢ كلمة٣ كلمة٤"
+
+    def lire(url):
+        if echec:
+            raise Q.CoranIndisponible("réseau coupé")
+        arabe = "quran-uthmani" in url
+        if "/surah/1/" in url:
+            textes = [("﻿" + basmala) if arabe else "Au nom…"] + [f"نص1:{v}" if arabe else f"trad 1:{v}" for v in range(2, 8)]
+            return {"data": {"number": 1, "name": "سورة١", "ayahs": [{"numberInSurah": i + 1, "text": t} for i, t in enumerate(textes)]}}
+        ayahs = []
+        for n, _, total in Q.SOURATES[1:]:
+            for v in range(1, total + 1 - (versets_en_moins if n == 78 else 0)):
+                texte = (f"نص{n}:{v}" if arabe else f"trad {n}:{v}")
+                if arabe and v == 1:
+                    texte = basmala.replace("كلمة١", "كَلِمة١") + " " + texte  # basmala collée, vocalisée autrement
+                ayahs.append({"numberInSurah": v, "text": texte, "surah": {"number": n, "name": f"سورة{n}"}})
+        return {"data": {"ayahs": ayahs}}
+    return lire
+
+
+def client_coran(tmp_path, **options):
+    import coran as Q
+    env = {**ENV, "ECOLE_DB": str(tmp_path / "ecole.db")}
+    q = Q.Coran(str(tmp_path / "coran"), lire=fausse_api_coran(**options))
+    c = TestClient(creer_app(Config(env), FauxTuteur(), coran=q), base_url="http://test")
+    c.coran = q
+    return c
+
+
+def test_coran_texte_verifie_et_basmala_separee(tmp_path):
+    c = client_coran(tmp_path)
+    se_connecter(c)
+    sommaire = c.get("/api/ecole/coran").json()
+    assert [s["numero"] for s in sommaire["sourates"]][:4] == [1, 114, 113, 112]
+    assert "Hamidullah" in sommaire["sources"] and set(sommaire["recitants"]) == {"husary", "alafasy"}
+    fatiha = c.get("/api/ecole/coran/1").json()
+    assert len(fatiha["versets"]) == 7 and fatiha["basmala"] is False
+    nas = c.get("/api/ecole/coran/114").json()
+    assert nas["basmala"] is True and nas["versets"][0]["arabe"] == "نص114:1"  # basmala retirée du 1er verset
+    assert nas["versets"][0]["francais"] == "trad 114:1"
+    assert (tmp_path / "coran" / "texte.json").exists()
+    assert c.get("/api/ecole/coran/2").status_code == 404
+
+
+def test_coran_refuse_un_texte_incomplet(tmp_path):
+    c = client_coran(tmp_path, versets_en_moins=1)
+    se_connecter(c)
+    assert c.get("/api/ecole/coran").status_code == 503
+    assert not (tmp_path / "coran" / "texte.json").exists()
+    (tmp_path / "b").mkdir()
+    c2 = client_coran(tmp_path / "b", echec=True)
+    se_connecter(c2)
+    assert c2.get("/api/ecole/coran/1").status_code == 503
+
+
+def test_coran_progression_et_audio(tmp_path):
+    c = client_coran(tmp_path)
+    assert c.get("/api/ecole/coran").status_code == 401
+    se_connecter(c)
+    assert c.post("/api/ecole/coran/112/progres", json={"appris": 3}).json() == {"appris": 3}
+    assert c.post("/api/ecole/coran/112/progres", json={"appris": 9}).status_code == 400
+    assert next(s for s in c.get("/api/ecole/coran").json()["sourates"] if s["numero"] == 112)["appris"] == 3
+    # Audio déjà en cache : servi sans téléchargement ; la basmala (verset 0) est le 1er verset d'Al-Fâtiha
+    dossier = tmp_path / "coran" / "audio" / "husary"
+    dossier.mkdir(parents=True)
+    (dossier / "001001.mp3").write_bytes(b"ID3" * 500)
+    assert c.get("/api/ecole/coran/audio/husary/114/0").headers["content-type"] == "audio/mpeg"
+    assert c.get("/api/ecole/coran/audio/inconnu/1/1").status_code == 404
+    assert c.get("/api/ecole/coran/audio/husary/114/7").status_code == 404
+    assert c.get("/api/ecole/coran/audio/husary/2/1").status_code == 404
+    se_connecter(c, "papa-2026")
+    suivi = c.get("/api/ecole/suivi").json()
+    assert suivi["coran"] == [{"numero": 112, "nom": "Al-Ikhlâs", "versets": 4, "versets_appris": 3,
+                               "maj": suivi["coran"][0]["maj"]}]

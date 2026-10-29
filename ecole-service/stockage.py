@@ -44,6 +44,12 @@ CREATE TABLE IF NOT EXISTS appels_voix (
     nombre INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS coran_progres (
+    sourate INTEGER PRIMARY KEY,
+    versets_appris INTEGER NOT NULL,
+    maj REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS reglages (
     cle TEXT PRIMARY KEY,
     valeur TEXT NOT NULL
@@ -171,6 +177,18 @@ class Stockage:
         ligne = self.db.execute("SELECT nombre FROM appels_voix WHERE jour = ?", (aujourdhui(),)).fetchone()
         return ligne["nombre"] if ligne else 0
 
+    # --- Coran ------------------------------------------------------------
+
+    def coran_progres(self) -> dict[int, dict]:
+        return {l["sourate"]: {"versets_appris": l["versets_appris"], "maj": l["maj"]}
+                for l in self.db.execute("SELECT * FROM coran_progres")}
+
+    def noter_coran(self, sourate: int, versets_appris: int):
+        with self.verrou, self.db:
+            self.db.execute("INSERT INTO coran_progres (sourate, versets_appris, maj) VALUES (?, ?, ?) "
+                            "ON CONFLICT (sourate) DO UPDATE SET versets_appris = excluded.versets_appris, maj = excluded.maj",
+                            (sourate, versets_appris, time.time()))
+
     def noter_question(self, chapitre, question, bloquee=False):
         with self.verrou, self.db:
             self.db.execute("INSERT INTO questions_tuteur (chapitre, question, bloquee, cree_le) VALUES (?, ?, ?, ?)",
@@ -222,7 +240,7 @@ class Stockage:
                 "appels_ia_aujourdhui": appels["nombre"] if appels else 0}
 
     def tout_effacer(self):
-        """Efface le travail de l'élève ; la classe choisie reste."""
+        """Efface le travail de l'élève ; la classe choisie et la progression au Coran restent."""
         with self.verrou, self.db:
             for table in ("exercices", "niveaux", "questions_tuteur"):
                 self.db.execute(f"DELETE FROM {table}")
