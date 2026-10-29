@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mon cahier de maths</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="ecole.css">
+  <script type="module" src="ecole.js"></script>
+</head>
+<body>
+  <header class="barre">
+    <div class="barre-dedans">
+      <a class="marque" href="#accueil">Mon cahier de maths</a>
+      <div class="barre-droite">
+        <span class="etoiles-total" id="etoiles-total" hidden></span>
+        <a class="lien-barre" id="lien-suivi" href="#suivi" hidden>Suivi</a>
+        <button class="lien-barre" id="sortir" type="button" hidden>Sortir</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <p class="chargement" id="chargement">Chargement…</p>
+
+    <!-- Connexion -->
+    <section id="vue-connexion" class="vue" hidden>
+      <div class="connexion">
+        <h1>Bonjour !</h1>
+        <p>Entre ton code secret pour ouvrir ton cahier.</p>
+        <form id="form-connexion" class="ligne">
+          <label class="cache" for="code">Code secret</label>
+          <input id="code" type="password" autocomplete="current-password" required maxlength="64" placeholder="Ton code">
+          <button class="bouton" type="submit">Entrer</button>
+        </form>
+        <p class="message" id="message-connexion" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <!-- Accueil : les chapitres -->
+    <section id="vue-accueil" class="vue" hidden>
+      <h1 id="bonjour">Bonjour</h1>
+      <p class="classe-actuelle" id="classe-actuelle"></p>
+      <div class="conseil" id="conseil" hidden>
+        <p class="conseil-titre">À travailler aujourd'hui</p>
+        <p class="conseil-texte" id="conseil-texte"></p>
+        <a class="bouton" id="conseil-lien" href="#accueil">J'y vais</a>
+      </div>
+      <div id="domaines"></div>
+      <div id="revisions"></div>
+    </section>
+
+    <!-- Un chapitre : la leçon et le tuteur -->
+    <section id="vue-chapitre" class="vue" hidden>
+      <a class="retour" href="#accueil">← Tous les chapitres</a>
+      <p class="surtitre" id="chap-domaine"></p>
+      <h1 id="chap-titre"></h1>
+      <p class="resume" id="chap-resume"></p>
+
+      <div class="actions-chapitre">
+        <button class="bouton gros" id="commencer" type="button">Faire les exercices</button>
+        <span class="niveau-texte" id="chap-niveau"></span>
+      </div>
+
+      <article class="lecon">
+        <h2>À retenir</h2>
+        <ul id="chap-retenir"></ul>
+        <h2>Exemple</h2>
+        <p class="exemple-question" id="chap-exemple-q"></p>
+        <ol class="etapes" id="chap-exemple-etapes"></ol>
+      </article>
+
+      <section class="tuteur" aria-labelledby="titre-tuteur">
+        <h2 id="titre-tuteur">Une question sur la leçon ?</h2>
+        <p class="tuteur-intro" id="tuteur-intro">Ton tuteur t'explique avec d'autres mots, ou avec un exemple.</p>
+        <div class="fil" id="fil" aria-live="polite"></div>
+        <div class="suggestions" id="suggestions"></div>
+        <form id="form-tuteur" class="ligne">
+          <label class="cache" for="question">Ta question</label>
+          <input id="question" type="text" autocomplete="off" maxlength="400" placeholder="Écris ta question ici">
+          <button class="bouton" type="submit">Demander</button>
+        </form>
+      </section>
+    </section>
+
+    <!-- Les exercices -->
+    <section id="vue-exercices" class="vue" hidden>
+      <div class="entete-ex">
+        <a class="retour" id="retour-lecon" href="#accueil">← La leçon</a>
+        <span class="compteur" id="compteur"></span>
+      </div>
+      <div class="piste" aria-hidden="true"><div class="piste-remplie" id="piste"></div></div>
+      <div class="carte" id="carte">
+        <p class="enonce" id="enonce"></p>
+        <form id="form-reponse" class="zone-reponse"></form>
+        <button class="lien" id="voir-indice" type="button">Voir un indice</button>
+        <p class="indice" id="indice" hidden></p>
+        <p class="retour-reponse" id="retour-reponse" aria-live="polite"></p>
+        <div class="correction" id="correction" hidden>
+          <p class="correction-titre">Comment on fait</p>
+          <p class="correction-texte" id="correction-texte"></p>
+        </div>
+        <div class="autrement" id="autrement" hidden>
+          <p class="correction-titre">Ton tuteur t'explique autrement</p>
+          <p class="correction-texte" id="autrement-texte"></p>
+        </div>
+        <div class="boutons-suite" id="boutons-suite" hidden>
+          <button class="bouton secondaire" id="pas-compris" type="button">Je n'ai pas compris</button>
+          <button class="bouton" id="suivant" type="button">Question suivante</button>
+        </div>
+      </div>
+      <div class="fin" id="fin" hidden>
+        <h2 id="fin-titre"></h2>
+        <p id="fin-texte"></p>
+        <div class="ligne">
+          <button class="bouton" id="encore" type="button">Une autre série</button>
+          <a class="bouton secondaire" href="#accueil">Autre chapitre</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Suivi du parent -->
+    <section id="vue-suivi" class="vue" hidden>
+      <a class="retour" href="#accueil">← Les chapitres</a>
+      <h1>Suivi</h1>
+      <p class="resume" id="suivi-resume"></p>
+
+      <h2>Classe</h2>
+      <p class="aide">Le programme suit la classe choisie ici. Les chapitres des classes d'avant restent ouverts pour réviser.</p>
+      <form id="form-classe" class="ligne">
+        <label class="cache" for="choix-classe">Classe</label>
+        <select id="choix-classe"></select>
+        <button class="bouton secondaire" type="submit">Changer de classe</button>
+      </form>
+      <p class="message" id="message-classe" aria-live="polite"></p>
+
+      <h2>Les 14 derniers jours</h2>
+      <div class="activite" id="activite"></div>
+
+      <h2>Par chapitre</h2>
+      <div class="tableau-defile">
+        <table class="tableau">
+          <thead>
+            <tr><th scope="col">Chapitre</th><th scope="col">Niveau</th><th scope="col">Exercices</th>
+                <th scope="col">Réussis du 1er coup</th><th scope="col">7 derniers jours</th><th scope="col">Derniers ratés</th></tr>
+          </thead>
+          <tbody id="suivi-chapitres"></tbody>
+        </table>
+      </div>
+
+      <h2>Questions posées au tuteur</h2>
+      <p class="aide">Les messages bloqués par le filtre de sécurité sont signalés en rouge.</p>
+      <ul class="questions" id="suivi-questions"></ul>
+
+      <h2>Repartir de zéro</h2>
+      <p class="aide">Efface tous les exercices, les niveaux et les questions. Les leçons restent.</p>
+      <button class="bouton danger" id="effacer" type="button">Tout effacer</button>
+      <p class="message" id="message-effacer" aria-live="polite"></p>
+    </section>
+  </main>
+</body>
+</html>
