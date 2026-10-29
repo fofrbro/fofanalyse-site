@@ -30,6 +30,14 @@ fofanalyse.com {
 	header @ecole Content-Security-Policy "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
 	header @ecole X-Robots-Tag "noindex, nofollow"
 
+	# Micro de l'espace de révision : la question de l'enfant, enregistrée (une minute au plus).
+	handle /api/ecole/ecoute {
+		request_body {
+			max_size 2MB
+		}
+		reverse_proxy ecole:8000
+	}
+
 	# API de l'espace de révision : petites requêtes JSON seulement.
 	handle /api/ecole/* {
 		request_body {

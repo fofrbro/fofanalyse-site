@@ -50,6 +50,14 @@ CREATE TABLE IF NOT EXISTS coran_progres (
     maj REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS explications (
+    chapitre TEXT NOT NULL,
+    classe TEXT NOT NULL,
+    texte TEXT NOT NULL,
+    cree_le REAL NOT NULL,
+    PRIMARY KEY (chapitre, classe)
+);
+
 CREATE TABLE IF NOT EXISTS reglages (
     cle TEXT PRIMARY KEY,
     valeur TEXT NOT NULL
@@ -176,6 +184,18 @@ class Stockage:
     def appels_voix_aujourdhui(self) -> int:
         ligne = self.db.execute("SELECT nombre FROM appels_voix WHERE jour = ?", (aujourdhui(),)).fetchone()
         return ligne["nombre"] if ligne else 0
+
+    # --- Cours de la maîtresse (gardés : chaque leçon n'est expliquée par l'IA qu'une fois) ---
+
+    def explication(self, chapitre, classe) -> str | None:
+        ligne = self.db.execute("SELECT texte FROM explications WHERE chapitre = ? AND classe = ?",
+                                (chapitre, classe)).fetchone()
+        return ligne["texte"] if ligne else None
+
+    def garder_explication(self, chapitre, classe, texte):
+        with self.verrou, self.db:
+            self.db.execute("INSERT OR REPLACE INTO explications (chapitre, classe, texte, cree_le) VALUES (?, ?, ?, ?)",
+                            (chapitre, classe, texte, time.time()))
 
     # --- Coran ------------------------------------------------------------
 

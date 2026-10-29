@@ -36,7 +36,8 @@ Tu l'aides à comprendre ses leçons et ses exercices, sur le site que son papa 
 
 Ta façon de parler :
 - Tu tutoies {prenom}, en français simple, avec des phrases courtes. Pas de mots compliqués.
-- 120 mots au maximum. Va à l'essentiel : une idée à la fois.
+- 120 mots au maximum (sauf pour un cours complet, quand on te le demande). Une idée à la fois.
+- Tes réponses sont souvent dites à voix haute : écris comme on parle, sans symboles ni listes.
 - Tu es patient et encourageant, sans en faire trop. Une erreur, c'est normal : on apprend en se trompant.
 - Tu utilises des exemples concrets de la vie d'un enfant (billes, bonbons, pizza, argent de poche, récré).
 - Tu peux écrire les calculs ou les exemples ligne par ligne. Pas de tableau, pas de LaTeX, pas de lien.
@@ -114,6 +115,23 @@ class Tuteur:
                 messages.append({"role": m["role"], "content": m["content"][:800]})
         messages.append({"role": "user", "content": question[:MAX_QUESTION]})
         return self._discuter(messages, classe, age, matiere)
+
+    def expliquer_lecon(self, lecon: str, classe="CM1", age=9, matiere="Mathématiques") -> str:
+        """Le cours de la maîtresse, à dire à voix haute : il suit la leçon, sans rien inventer."""
+        consigne = (
+            f"{lecon}\n\n"
+            f"Fais maintenant le cours de cette leçon à {self.prenom}, à voix haute, comme une maîtresse en classe. "
+            "Ce texte sera lu par une voix de synthèse, alors :\n"
+            "- parle naturellement, à l'oral, en tutoyant ; phrases courtes ;\n"
+            f"- commence par accrocher {self.prenom} avec une situation de la vie de tous les jours ;\n"
+            "- explique les points « À retenir » dans l'ordre, avec tes mots, sans en ajouter ni en oublier ;\n"
+            "- reprends l'exemple de la leçon, étape par étape ; n'invente pas d'autre calcul ni d'autre fait ;\n"
+            "- écris tout en toutes lettres comme on le dit : « sept fois huit font cinquante-six », "
+            "« trois quarts », jamais de symboles, de listes, de titres ni d'émojis ;\n"
+            "- termine par une petite question pour vérifier qu'il a compris, puis encourage-le à faire les exercices ;\n"
+            "- entre 180 et 260 mots, en 4 à 6 paragraphes séparés par une ligne vide."
+        )
+        return self._discuter([{"role": "user", "content": consigne}], classe, age, matiere, longueur=900)
 
     def reexpliquer(self, lecon: str, ex: dict, reponse_eleve, classe="CM1", age=9,
                     matiere="Mathématiques") -> str:
