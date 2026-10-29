@@ -149,6 +149,7 @@ function texteLecon(c) {
 
 function texteEnonce(ex) {
   let texte = ex.enonce;
+  if (ex.arabe) texte += `\n${ex.arabe}`;
   if (ex.type === "choix") texte += `\nRéponses possibles : ${ex.options.join(", ou ")}.`;
   if (ex.type === "multi") texte += `\nÉcris : ${ex.champs.map((c) => c.label).join(", puis ")}.`;
   if (ex.unite && ex.type === "nombre") texte += `\nRéponds en ${ex.unite}.`;
@@ -371,6 +372,8 @@ function afficherExercice() {
 
   const enonce = $("enonce");
   enonce.textContent = ex.enonce;
+  $("arabe").hidden = !ex.arabe;
+  $("arabe").textContent = ex.arabe || "";
   enonce.classList.toggle("grand", Boolean(ex.grand));
 
   const form = $("form-reponse");
