@@ -20,6 +20,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from tuteur import noter_erreur
+
 URL_VOIX = "https://api.openai.com/v1/audio/speech"
 URL_TRANSCRIPTION = "https://api.openai.com/v1/audio/transcriptions"
 MAX_AUDIO_ENFANT = 1_500_000  # environ une minute d'enregistrement
@@ -128,7 +130,7 @@ class Voix:
             with urllib.request.urlopen(requete, timeout=60) as r:
                 audio = r.read()
         except (urllib.error.URLError, TimeoutError) as e:
-            raise VoixIndisponible(str(e)) from e
+            raise VoixIndisponible(noter_erreur("voix", e)) from e
         if not audio:
             raise VoixIndisponible("audio vide")
         self.dossier.mkdir(parents=True, exist_ok=True)
@@ -154,7 +156,7 @@ class Voix:
             with urllib.request.urlopen(requete, timeout=60) as r:
                 return json.loads(r.read()).get("text", "").strip()
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
-            raise VoixIndisponible(str(e)) from e
+            raise VoixIndisponible(noter_erreur("transcription", e)) from e
 
     def nettoyer(self):
         fichiers = sorted(self.dossier.glob("*.mp3"), key=lambda f: f.stat().st_mtime)

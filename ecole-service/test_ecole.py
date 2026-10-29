@@ -642,3 +642,23 @@ def test_micro_et_choix_de_la_voix(tmp_path):
     a = c.post("/api/ecole/voix", json={"texte": "Bonjour", "voix": "nova"}).json()["audio"]
     b = c.post("/api/ecole/voix", json={"texte": "Bonjour"}).json()["audio"]
     assert a != b  # deux voix différentes, deux audios différents
+
+
+def test_cause_des_echecs_openai():
+    import io
+    import urllib.error
+    from tuteur import DERNIERE_ERREUR, Tuteur
+    corps = io.BytesIO(b'{"error": {"message": "You exceeded your current quota", "code": "insufficient_quota"}}')
+    erreur = urllib.error.HTTPError("https://api.openai.com/v1/chat/completions", 429, "Too Many Requests", {}, corps)
+    t = Tuteur("cle", "gpt-4o-mini", "Mouaz")
+
+    def refus(*a, **k):
+        raise erreur
+    import urllib.request
+    ancien, urllib.request.urlopen = urllib.request.urlopen, refus
+    try:
+        with pytest.raises(TuteurIndisponible, match="HTTP 429 You exceeded your current quota"):
+            t.repondre("Leçon", "Question ?", [])
+    finally:
+        urllib.request.urlopen = ancien
+    assert DERNIERE_ERREUR["service"] == "completions" and "429" in DERNIERE_ERREUR["cause"]

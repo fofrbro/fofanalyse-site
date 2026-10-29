@@ -16,6 +16,8 @@ d'information personnelle, renvoyer vers un adulte en cas de souci).
 
 import json
 import os
+import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -65,6 +67,27 @@ class TuteurIndisponible(Exception):
     pass
 
 
+def cause_openai(e: Exception) -> str:
+    """Une explication courte de l'échec d'un appel à OpenAI (code HTTP et message), sans la clé."""
+    if isinstance(e, urllib.error.HTTPError):
+        try:
+            message = json.loads(e.read()).get("error", {}).get("message", "")
+        except (ValueError, AttributeError, OSError):
+            message = ""
+        return f"HTTP {e.code} {message}".strip()[:300]
+    return f"{type(e).__name__} : {e}"[:300]
+
+
+DERNIERE_ERREUR = {}  # dernière erreur OpenAI, montrée au parent dans le suivi
+
+
+def noter_erreur(service: str, e: Exception) -> str:
+    cause = cause_openai(e)
+    DERNIERE_ERREUR.update({"service": service, "cause": cause, "quand": time.time()})
+    print(f"[ecole] échec OpenAI ({service}) : {cause}", file=sys.stderr, flush=True)
+    return cause
+
+
 class Tuteur:
     def __init__(self, cle: str | None, modele: str, prenom: str):
         self.cle = cle
@@ -75,7 +98,7 @@ class Tuteur:
     def actif(self) -> bool:
         return bool(self.cle)
 
-    def _post(self, url, donnees, delai=30):
+    def _post(self, url, donnees, delai=60):
         requete = urllib.request.Request(
             url, data=json.dumps(donnees).encode(), method="POST",
             headers={"Authorization": f"Bearer {self.cle}", "Content-Type": "application/json"})
@@ -83,7 +106,7 @@ class Tuteur:
             with urllib.request.urlopen(requete, timeout=delai) as r:
                 return json.loads(r.read())
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
-            raise TuteurIndisponible(str(e)) from e
+            raise TuteurIndisponible(noter_erreur(url.rsplit("/", 1)[-1], e)) from e
 
     def message_autorise(self, texte: str) -> bool:
         """Filtre de modération d'OpenAI (gratuit). En cas de panne, on laisse passer :

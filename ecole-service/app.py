@@ -45,7 +45,7 @@ import lecons
 from stockage import Stockage
 import coran as Q
 import voix as V
-from tuteur import REPONSE_BLOQUEE, TuteurIndisponible, depuis_environnement
+from tuteur import DERNIERE_ERREUR, REPONSE_BLOQUEE, TuteurIndisponible, depuis_environnement
 
 COOKIE = "ecole_session"
 DUREE_SESSION = 30 * 86400
@@ -432,6 +432,7 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None, coran=None) 
         return JSONResponse({**stock.suivi_parent(ids), "plafond_ia": config.ia_par_jour, "tuteur": tuteur.actif,
                              "voix": voix.active, "appels_voix_aujourdhui": stock.appels_voix_aujourdhui(),
                              "voix_choisie": voix_choisie(), "voix_disponibles": V.VOIX_DISPONIBLES,
+                             "erreur_openai": DERNIERE_ERREUR or None,
                              "plafond_voix": config.voix_par_jour,
                              "classe": classe(), "classes": list(lecons.CLASSES),
                              "coran": [{"numero": n, "nom": nom, "versets": total, **progres}
