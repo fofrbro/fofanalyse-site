@@ -47,7 +47,7 @@ from tuteur import REPONSE_BLOQUEE, TuteurIndisponible, depuis_environnement
 
 COOKIE = "ecole_session"
 DUREE_SESSION = 30 * 86400
-CHAMPS_PUBLICS = ("type", "enonce", "grand", "unite", "champs", "options", "indice")
+CHAMPS_PUBLICS = ("type", "enonce", "grand", "unite", "champs", "options", "indice", "arabe")
 
 
 class Config:
@@ -208,7 +208,7 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None) -> Starlette
         for ex in catalogue.serie(chapitre, niveau, 8, prenom=config.prenom):
             id_ = secrets.token_urlsafe(12)
             stock.enregistrer_exercice(id_, chapitre, niveau, ex)
-            liste.append({"id": id_, **{k: ex[k] for k in CHAMPS_PUBLICS}})
+            liste.append({"id": id_, **{k: ex.get(k) for k in CHAMPS_PUBLICS}})
         return JSONResponse({"chapitre": chapitre, "niveau": niveau, "exercices": liste})
 
     @protege()

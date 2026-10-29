@@ -107,7 +107,7 @@ def test_chaque_chapitre_a_sa_lecon():
     assert set(catalogue.GENERATEURS) == set(lecons.PAR_ID)
     assert len(lecons.PAR_ID) == len(lecons.CHAPITRES)  # identifiants uniques d'une classe à l'autre
     for c in lecons.CHAPITRES:
-        assert c["classe"] in lecons.CLASSES
+        assert c["classe"] in lecons.CLASSES or c in lecons.COMMUNS
         assert c["retenir"] and c["exemple"]["etapes"]
         assert c["titre"] in lecons.lecon_en_texte(c["id"])
 
@@ -479,6 +479,31 @@ def test_banques_de_questions():
 
 
 def test_une_serie_de_quiz_a_8_questions():
-    for chapitre in ("hist-cm1-gaule", "ang-6e-present", "emc-cm2-citoyen"):
+    for chapitre in ("hist-cm1-gaule", "ang-6e-present", "emc-cm2-citoyen", *[c["id"] for c in lecons.COMMUNS]):
         for niveau in (1, 2, 3):
             assert len(catalogue.serie(chapitre, niveau, 8, random.Random(niveau))) == 8
+
+
+# --- Arabe -------------------------------------------------------------------------------------------
+
+def test_alphabet_arabe():
+    import arabe as A
+    assert len(A.LETTRES) == 28 and len({l[0] for l in A.LETTRES}) == 28 and len({l[1] for l in A.LETTRES}) == 28
+    assert "".join(A.GROUPES.values()) == "".join(l[0] for l in A.LETTRES)
+    assert A.forme("ب", "début") == "بـ" and A.forme("ب", "milieu") == "ـبـ" and A.forme("ب", "fin") == "ـب"
+    assert A.forme("د", "début") == "د" and A.forme("د", "milieu") == "ـد"  # dal ne s'attache pas à la suivante
+    assert A.transcription("ص") == "S" and A.transcription("ع") == "'"
+    for mot in A.MOTS + A.PHRASES:
+        assert all("\u0600" <= ch <= "\u06ff" or ch in " ؟?" for ch in mot[0]), mot
+
+
+def test_arabe_pour_toutes_les_classes(client):
+    se_connecter(client)
+    for classe in ("CM1", "6e"):
+        se_connecter(client, "papa-2026")
+        client.post("/api/ecole/classe", json={"classe": classe})
+        prog = client.get("/api/ecole/programme").json()
+        arabe = [c for c in prog["chapitres"] if c["matiere"] == "arabe"]
+        assert len(arabe) == 7 and all(c["classe"] == classe for c in arabe)
+    serie = client.post("/api/ecole/serie", json={"chapitre": "ar-voyelles"}).json()
+    assert all(e["arabe"] for e in serie["exercices"])

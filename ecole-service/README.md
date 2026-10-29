@@ -2,7 +2,8 @@
 
 `https://fofanalyse.com/ecole/` : un espace privé où Mouaz révise toutes les
 matières de sa classe (CM1, CM2 ou 6e) : maths, français, sciences, histoire,
-géographie, anglais et enseignement moral et civique. Pour chaque chapitre : une leçon courte, des séries de 8 exercices
+géographie, anglais et enseignement moral et civique, plus une rubrique
+d'arabe. Pour chaque chapitre : une leçon courte, des séries de 8 exercices
 interactifs qui s'adaptent à son niveau, une correction pas à pas, et un
 tuteur IA qui réexplique quand il ne comprend pas. Le parent voit le suivi.
 
@@ -17,6 +18,7 @@ la bonne réponse :
 | `conjugaison.py` | calcule les formes des verbes (1er et 2e groupes, 15 irréguliers, 8 temps, accord avec « être ») |
 | `francais.py`, `francais_banques.py` | exercices de français : conjugaison et accords calculés, grammaire, homophones et vocabulaire tirés de banques vérifiées à la main |
 | `quiz.py`, `quiz_*.py` | sciences, histoire, géographie, anglais, EMC : leçons et banques de questions écrites et vérifiées à la main |
+| `arabe.py` | rubrique d'arabe : table des 28 lettres, formes attachées, voyelles, mots et phrases vocalisés |
 | `catalogue.py` | réunit les générateurs de toutes les classes et tire une série |
 | `stockage.py` | garde la classe choisie, les réponses et le niveau de chaque chapitre (SQLite) |
 | `tuteur.py` | réexplique *autrement*, en recevant la leçon, la bonne réponse calculée et la réponse de l'enfant ; il connaît sa classe et son âge |
@@ -65,6 +67,15 @@ sa leçon et au moins 10 questions réparties sur les 3 niveaux. Il n'y a rien
 à calculer : la bonne réponse est écrite dans la banque, avec son
 explication. En anglais, le vocabulaire se tape au clavier (« a », « an »,
 « the » acceptés devant le mot).
+
+**Arabe** (onglet « Arabe », le même pour toutes les classes) — 7 chapitres :
+les lettres (en trois groupes : nom, son, points), les lettres attachées
+(début, milieu, fin d'un mot), les voyelles (fatha, kasra, damma, voyelles
+longues, soukoun), premiers mots et chiffres, saluer et se présenter. Les
+questions sont construites à partir de la table des lettres et de listes de
+mots vocalisés avec leur transcription. Le texte arabe s'affiche en grand,
+de droite à gauche, et la voix le lit. La police arabe est celle de
+l'appareil (aucune ressource externe), agrandie pour être lisible.
 
 **À relire par un adulte** : ces contenus sont écrits à la main ; le code
 vérifie leur cohérence (pas de doublon, la bonne réponse n'est pas parmi

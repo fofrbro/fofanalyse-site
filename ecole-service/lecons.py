@@ -14,6 +14,7 @@ d'exercices, et une ligne dans CLASSES ci-dessous et dans catalogue.py.
 
 import lecons_6e
 import lecons_cm2
+import arabe
 import lecons_francais
 import quiz
 
@@ -199,7 +200,7 @@ CHAPITRES_CM1 = [
     },
 ]
 
-MATIERES = {"maths": "Mathématiques", "francais": "Français", **quiz.NOMS}
+MATIERES = {"maths": "Mathématiques", "francais": "Français", **quiz.NOMS, "arabe": "Arabe"}
 MATHS = {"CM1": CHAPITRES_CM1, "CM2": lecons_cm2.CHAPITRES, "6e": lecons_6e.CHAPITRES}
 PAR_MATIERE = {"maths": MATHS, "francais": lecons_francais.PAR_CLASSE,
                **{m: quiz.lecons_par_classe(m) for m in quiz.MODULES}}
@@ -215,14 +216,20 @@ CLASSES = {
     for nom, age in (("CM1", 9), ("CM2", 10), ("6e", 11))
 }
 
-CHAPITRES = [c for infos in CLASSES.values() for c in infos["chapitres"]]
+# Matières qui ne dépendent pas de la classe (l'arabe) : proposées à toutes les classes.
+COMMUNS = arabe.CHAPITRES
+for _chapitre in COMMUNS:
+    _chapitre["classe"], _chapitre["matiere"] = None, "arabe"
+
+CHAPITRES = [c for infos in CLASSES.values() for c in infos["chapitres"]] + COMMUNS
 PAR_ID = {c["id"]: c for c in CHAPITRES}
 
 
 def chapitres_jusqua(classe: str) -> list[dict]:
     """Les chapitres de la classe, précédés de ceux des classes d'avant (pour réviser)."""
     noms = list(CLASSES)
-    return [c for nom in noms[:noms.index(classe) + 1] for c in CLASSES[nom]["chapitres"]]
+    communs = [{**c, "classe": classe} for c in COMMUNS]  # affichés avec la classe en cours
+    return [c for nom in noms[:noms.index(classe) + 1] for c in CLASSES[nom]["chapitres"]] + communs
 
 
 def lecon_en_texte(chapitre_id: str) -> str:
