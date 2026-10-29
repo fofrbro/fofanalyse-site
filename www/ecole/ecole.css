@@ -1,4 +1,4 @@
-/* Mon cahier de maths : l'espace de révision, du CM1 à la 6e.
+/* Mon cahier : l'espace de révision (maths et français), du CM1 à la 6e.
    Une page de cahier Seyès (lignes bleues, marge rouge), polices système,
    aucune ressource externe ni style en ligne (CSP du site). */
 
@@ -122,6 +122,18 @@ input:focus { outline: 3px solid var(--encre); outline-offset: 1px; }
 }
 .conseil-titre { margin: 0; font-size: .85rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--etoile); }
 .conseil-texte { margin: 0; font-size: 1.05rem; }
+.onglets { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 14px; }
+.onglet {
+  font: inherit; font-family: var(--titre); font-weight: 700; font-size: 1.1rem; cursor: pointer;
+  background: var(--carte); color: var(--encre); border: 2px solid var(--encre); border-radius: 999px; padding: 6px 18px;
+}
+.onglet[aria-selected="true"] { background: var(--encre); color: var(--carte); }
+.zone-reponse input.mot { flex: 1 1 16rem; width: 16rem; font-family: var(--corps); font-size: 1.3rem; }
+.accents { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+.accent {
+  font: inherit; font-size: 1.1rem; min-width: 2.4rem; padding: 4px 8px; cursor: pointer;
+  background: var(--papier); color: var(--encre); border: 1.5px solid var(--bord); border-radius: 8px;
+}
 .classe-actuelle { margin: -6px 0 12px; font-weight: 700; color: var(--marge); }
 .revisions { margin-top: 32px; border-top: 2px dashed var(--ligne-forte); padding-top: 4px; }
 .revisions summary { cursor: pointer; font-family: var(--titre); font-weight: 700; font-size: 1.3rem; padding: 14px 0 6px; color: var(--doux); }

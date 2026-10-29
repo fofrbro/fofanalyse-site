@@ -35,13 +35,17 @@ def test_chaque_generateur_donne_des_exercices_complets(chapitre, niveau):
     for _ in range(300):
         ex = catalogue.generer(chapitre, niveau, rng)
         assert ex["enonce"] and ex["indice"] and ex["explication"] and ex["reponse_texte"]
-        assert ex["type"] in ("nombre", "multi", "choix")
+        assert ex["type"] in ("nombre", "multi", "choix", "texte")
         if ex["type"] == "choix":
             assert ex["reponse"] in ex["options"] and len(set(ex["options"])) == len(ex["options"])
             assert E.verifier(ex, ex["reponse"])
         elif ex["type"] == "multi":
             assert len(ex["champs"]) == len(ex["reponse"])
             assert E.verifier(ex, list(ex["reponse"]))
+        elif ex["type"] == "texte":
+            assert E.verifier(ex, ex["reponse_texte"].rstrip(" !").upper())  # la casse ne compte pas
+            assert all(E.verifier(ex, r) for r in ex["reponse"])
+            assert not E.verifier(ex, "") and not E.verifier(ex, "zzz")
         else:
             assert E.verifier(ex, ex["reponse"].replace(".", ","))
             assert Decimal(ex["reponse"]) >= 0
@@ -119,11 +123,11 @@ class FauxTuteur:
     def message_autorise(self, texte):
         return "interdit" not in texte
 
-    def repondre(self, lecon, question, historique, classe, age):
+    def repondre(self, lecon, question, historique, classe, age, matiere):
         self.appels.append(("repondre", lecon, question, historique, classe))
         return "Voici une explication."
 
-    def reexpliquer(self, lecon, ex, reponse, classe, age):
+    def reexpliquer(self, lecon, ex, reponse, classe, age, matiere):
         self.appels.append(("reexpliquer", ex, reponse))
         return "Essayons autrement."
 
@@ -171,7 +175,8 @@ def test_parcours_eleve(client):
     assert se_connecter(client) == {"role": "eleve", "prenom": "Mouaz", "tuteur": True, "voix": False,
                                     "classe": "CM1"}
     prog = client.get("/api/ecole/programme").json()
-    assert len(prog["chapitres"]) == 10 and prog["progres"]["tables"]["niveau"] == 1
+    assert len(prog["chapitres"]) == 16 and prog["progres"]["tables"]["niveau"] == 1
+    assert {c["matiere"] for c in prog["chapitres"]} == {"maths", "francais"}
 
     serie = client.post("/api/ecole/serie", json={"chapitre": "tables"}).json()
     assert len(serie["exercices"]) == 8
@@ -339,6 +344,8 @@ def test_texte_reecrit_pour_la_voix():
     assert pour_la_voix("36 408 ≈ 36 000 ✓") == "36408 environ 36000"
     assert pour_la_voix("Ligne 1\nLigne 2") == "Ligne 1. Ligne 2"
     assert pour_la_voix("2,5 km") == "2,5 km"
+    assert pour_la_voix("191 = 14 × … + …") == "191 égale 14 fois combien plus combien"
+    assert "combien" not in pour_la_voix("Conjugue « finir » au présent : nous …")
 
 
 class FausseVoix:
@@ -396,3 +403,55 @@ def test_voix_cache_et_plafond(tmp_path):
 def test_voix_absente_sans_cle(client):
     se_connecter(client)
     assert client.post("/api/ecole/voix", json={"texte": "Bonjour"}).status_code == 503
+
+
+# --- Français -------------------------------------------------------------------------------
+
+def test_conjugaison_juste():
+    import conjugaison as C
+    assert C.simple("commencer", "present")[3] == "commençons"
+    assert C.simple("manger", "imparfait") == ["mangeais", "mangeais", "mangeait", "mangions", "mangiez", "mangeaient"]
+    assert C.simple("manger", "passe_simple")[5] == "mangèrent"
+    assert C.simple("finir", "present")[5] == "finissent" and C.simple("finir", "passe_simple")[3] == "finîmes"
+    assert C.simple("voir", "imparfait")[3] == "voyions" and C.simple("être", "imparfait")[0] == "étais"
+    assert C.simple("aller", "futur")[0] == "irai" and C.simple("venir", "conditionnel")[3] == "viendrions"
+    assert C.imperatif("chanter") == ["chante", "chantons", "chantez"] and C.imperatif("pouvoir") is None
+    assert C.compose("aller", "passe_compose", 2, True) == ["est allée"]
+    assert C.compose("partir", "plus_que_parfait", 5, False) == ["étaient partis"]
+    assert C.compose("manger", "passe_compose", 0) == ["ai mangé"]
+    assert C.table("aimer", "passe_compose")[0] == "j'ai aimé"
+
+
+def test_reponses_ecrites():
+    ex = E.exercice("texte", "…", ["est allée", "elle est allée"], ["…"], "…")
+    assert E.verifier(ex, "Est allée.") and E.verifier(ex, "  elle   est allée ")
+    assert not E.verifier(ex, "est allee")  # les accents comptent
+    ex = E.exercice("texte", "…", ["j'ai mangé"], ["…"], "…")
+    assert E.verifier(ex, "J’ai mangé")  # apostrophe typographique acceptée
+
+
+def test_banques_de_francais():
+    import francais as F
+    import francais_banques as B
+    for phrase, mot, nature in B.NATURE:
+        assert F.mot_present_une_fois(phrase, mot), (phrase, mot)
+        assert nature in B.NATURES_6E and nature in B.ASTUCES_NATURE
+    for phrase, groupe, fonction in B.FONCTION:
+        assert F.mot_present_une_fois(phrase, groupe), (phrase, groupe)
+        assert fonction in B.FONCTIONS_6E and fonction in B.ASTUCES_FONCTION
+    for banque in (B.HOMOPHONES_CM1, B.HOMOPHONES_CM2):
+        for options, (astuce, phrases) in banque.items():
+            for phrase, bonne in phrases:
+                assert phrase.count("___") == 1 and bonne in options, phrase
+    for phrase, expression, _ in B.SENS:
+        assert expression in phrase
+    for mot, contraire in B.PREFIXES:
+        assert contraire.endswith(mot)
+    for phrase, verbes in B.PHRASES_VERBES:
+        assert all(F.mot_present_une_fois(phrase, v) for v in verbes), phrase
+
+
+def test_tuteur_connait_la_matiere(client):
+    se_connecter(client)
+    client.post("/api/ecole/tuteur", json={"chapitre": "fr-cm1-present", "question": "C'est quoi un verbe ?"})
+    assert "Le présent" in client.tuteur.appels[-1][1]

@@ -1,6 +1,7 @@
 """
-Leçons de mathématiques, classe par classe : CM1 ici, CM2 et 6e dans
-lecons_cm2.py et lecons_6e.py.
+Leçons, classe par classe et matière par matière : les maths de CM1 ici,
+celles de CM2 et de 6e dans lecons_cm2.py et lecons_6e.py, le français dans
+lecons_francais.py.
 
 Chaque leçon est courte et écrite pour un enfant de 9 ans : ce qu'il faut
 retenir, puis un exemple résolu. Elle sert deux fois : elle s'affiche sur
@@ -13,6 +14,7 @@ d'exercices, et une ligne dans CLASSES ci-dessous et dans catalogue.py.
 
 import lecons_6e
 import lecons_cm2
+import lecons_francais
 
 CHAPITRES_CM1 = [
     {
@@ -196,16 +198,19 @@ CHAPITRES_CM1 = [
     },
 ]
 
+MATIERES = {"maths": "Mathématiques", "francais": "Français"}
+MATHS = {"CM1": CHAPITRES_CM1, "CM2": lecons_cm2.CHAPITRES, "6e": lecons_6e.CHAPITRES}
+
+for _matiere, _par_classe in (("maths", MATHS), ("francais", lecons_francais.PAR_CLASSE)):
+    for _classe, _chapitres in _par_classe.items():
+        for _chapitre in _chapitres:
+            _chapitre["classe"], _chapitre["matiere"] = _classe, _matiere
+
 # Les classes dans l'ordre de la scolarité, avec l'âge habituel (pour le tuteur).
 CLASSES = {
-    "CM1": {"age": 9, "chapitres": CHAPITRES_CM1},
-    "CM2": {"age": 10, "chapitres": lecons_cm2.CHAPITRES},
-    "6e": {"age": 11, "chapitres": lecons_6e.CHAPITRES},
+    nom: {"age": age, "chapitres": MATHS[nom] + lecons_francais.PAR_CLASSE[nom]}
+    for nom, age in (("CM1", 9), ("CM2", 10), ("6e", 11))
 }
-
-for _classe, _infos in CLASSES.items():
-    for _chapitre in _infos["chapitres"]:
-        _chapitre["classe"] = _classe
 
 CHAPITRES = [c for infos in CLASSES.values() for c in infos["chapitres"]]
 PAR_ID = {c["id"]: c for c in CHAPITRES}

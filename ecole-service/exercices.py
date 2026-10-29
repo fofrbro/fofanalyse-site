@@ -9,7 +9,8 @@ pas sont donc toujours justes. Le modèle de langage n'intervient qu'ensuite,
 pour réexpliquer autrement, en recevant la bonne réponse calculée ici.
 
 Un exercice est un dictionnaire :
-  type         "nombre" (une réponse), "multi" (plusieurs cases) ou "choix"
+  type         "nombre" (une réponse), "multi" (plusieurs cases), "choix" ou "texte" (un mot ou
+               un groupe de mots, en français : « reponse » est alors la liste des formes acceptées)
   enonce       le texte de la question
   grand        True pour un calcul court affiché en gros (« 47 × 23 »)
   unite        unité affichée après la case (« cm »), ou None
@@ -90,8 +91,20 @@ def chiffres(n: int) -> list[int]:
     return [int(c) for c in reversed(str(n))]
 
 
+def normaliser(texte) -> str:
+    """Réponse écrite : minuscules, apostrophe droite, espaces simples, sans point final.
+    Les accents comptent : c'est de l'orthographe."""
+    t = str(texte or "").replace("’", "'").replace(" ", " ").strip().lower()
+    t = " ".join(t.split()).replace(" '", "'").replace("' ", "'")
+    return t.rstrip(" .!?")
+
+
 def exercice(type_, enonce, reponse, explication, indice, *, grand=False, unite=None,
              champs=None, options=None, reponse_texte=None):
+    if type_ == "texte":
+        reponse = [reponse] if isinstance(reponse, str) else list(reponse)
+        reponse_texte = reponse_texte or reponse[0]
+        reponse = sorted({normaliser(r) for r in reponse})
     if type_ == "multi":
         reponse = [str(r) for r in reponse]
     elif type_ == "nombre":
@@ -117,6 +130,8 @@ def verifier(ex: dict, reponse_eleve) -> bool:
     """Compare la réponse de l'enfant à la bonne réponse."""
     if ex["type"] == "choix":
         return str(reponse_eleve).strip() == ex["reponse"]
+    if ex["type"] == "texte":
+        return normaliser(reponse_eleve) in ex["reponse"]
     if ex["type"] == "multi":
         if not isinstance(reponse_eleve, list) or len(reponse_eleve) != len(ex["reponse"]):
             return False
