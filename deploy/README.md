@@ -210,19 +210,48 @@ cd /srv/fofanalyse-site/deploy && docker compose up -d --build
 Les pages du site sont servies directement depuis `www/` : un `git pull`
 suffit à les publier.
 
-Si le `Caddyfile` a changé (une nouvelle page avec sa CSP, par exemple),
-le valider puis le recharger, sans couper le site :
+### Si le `Caddyfile` a changé
+
+C'est le cas quand une page ou un service s'ajoute (sa CSP, sa route
+`/api/…`). Pour le savoir, après le `git pull` :
 
 ```bash
-cd /srv/fofanalyse-site/deploy && docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile && docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+cd /srv/fofanalyse-site && git diff --stat HEAD@{1} -- deploy/Caddyfile
 ```
 
-Vérifier ensuite depuis l'extérieur l'en-tête de la page concernée, par
-exemple `curl -sI https://fofanalyse.com/acces/ | grep -i content-security`.
-Si l'ancienne politique persiste, contrôler que le conteneur voit le nouveau
-fichier (`docker compose exec caddy grep acces /etc/caddy/Caddyfile`) ; sinon
-`docker compose up -d --force-recreate caddy` (certificats conservés dans le
-volume `caddy_data`).
+Le `Caddyfile` est monté seul dans le conteneur : `git pull` le remplace par
+un nouveau fichier, mais le conteneur garde l'ancien. Un simple
+`caddy reload` relit donc l'ancienne version. Il faut recréer le conteneur
+(quelques secondes de coupure ; les certificats restent dans le volume
+`caddy_data`).
+
+D'abord valider le nouveau fichier dans un conteneur jetable, pour ne pas
+remplacer un Caddy qui marche par un Caddy qui refuse de démarrer :
+
+```bash
+cd /srv/fofanalyse-site/deploy && docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile
+```
+
+S'il affiche `Valid configuration`, recréer Caddy :
+
+```bash
+docker compose up -d --force-recreate caddy
+```
+
+Vérifier ensuite depuis l'extérieur la page ou la route concernée, par
+exemple :
+
+```bash
+curl -sI https://fofanalyse.com/ecole/ | grep -i "content-security\|x-robots"
+```
+
+```bash
+curl -s https://fofanalyse.com/api/ecole/health
+```
+
+Symptôme d'un Caddy resté sur l'ancien fichier : une nouvelle route
+`/api/…` répond 404 avec une page vide, alors que son service est bien
+« Up » dans `docker compose ps`.
 
 ## 8. Le RAG avec habilitations
 
