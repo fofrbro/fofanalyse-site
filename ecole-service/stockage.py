@@ -39,6 +39,11 @@ CREATE TABLE IF NOT EXISTS appels_ia (
     nombre INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS appels_voix (
+    jour TEXT PRIMARY KEY,
+    nombre INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS reglages (
     cle TEXT PRIMARY KEY,
     valeur TEXT NOT NULL
@@ -150,6 +155,21 @@ class Stockage:
             self.db.execute("INSERT INTO appels_ia (jour, nombre) VALUES (?, 1) "
                             "ON CONFLICT (jour) DO UPDATE SET nombre = nombre + 1", (jour,))
             return True
+
+    def compter_appel_voix(self, plafond: int) -> bool:
+        """Compte un audio nouveau (ceux déjà en cache sont gratuits). False si le plafond du jour est atteint."""
+        jour = aujourdhui()
+        with self.verrou, self.db:
+            ligne = self.db.execute("SELECT nombre FROM appels_voix WHERE jour = ?", (jour,)).fetchone()
+            if (ligne["nombre"] if ligne else 0) >= plafond:
+                return False
+            self.db.execute("INSERT INTO appels_voix (jour, nombre) VALUES (?, 1) "
+                            "ON CONFLICT (jour) DO UPDATE SET nombre = nombre + 1", (jour,))
+            return True
+
+    def appels_voix_aujourdhui(self) -> int:
+        ligne = self.db.execute("SELECT nombre FROM appels_voix WHERE jour = ?", (aujourdhui(),)).fetchone()
+        return ligne["nombre"] if ligne else 0
 
     def noter_question(self, chapitre, question, bloquee=False):
         with self.verrou, self.db:

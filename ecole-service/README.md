@@ -57,6 +57,28 @@ La session est un cookie signé (HMAC), `HttpOnly`, `Secure`, `SameSite=Strict`,
 valable 30 jours. Au-delà de 8 codes faux en 15 minutes depuis une même
 adresse, la connexion est bloquée un quart d'heure.
 
+## La maîtresse virtuelle (voix)
+
+Un bouton « 🔊 Écouter » lit à voix haute la leçon, l'énoncé, la correction,
+l'explication « autrement » et chaque réponse du tuteur.
+
+- Voix d'OpenAI (`gpt-4o-mini-tts`, voix `coral` par défaut, réglable avec
+  `ECOLE_VOIX`), avec la consigne de parler comme une maîtresse calme qui
+  articule bien les nombres. Elle utilise la même clé que le tuteur
+  (`ECOLE_OPENAI_API_KEY`).
+- `voix.py` réécrit d'abord le texte pour l'oral : « 47 × 23 » → « 47 fois
+  23 », « 2/3 » → « 2 tiers », « cm² » → « centimètres carrés », « 36 408 »
+  lu comme un seul nombre.
+- Chaque audio est gardé dans `/data/voix` (volume `ecole_data`, 3 000
+  fichiers au plus) : un texte déjà écouté ne coûte plus rien. Seuls les
+  audios nouveaux comptent dans `ECOLE_VOIX_PAR_JOUR` (200 par défaut).
+- Coût (tarifs OpenAI de 2025, à vérifier) : de l'ordre d'un centime pour
+  une explication d'une demi-minute.
+- Sans clé, si le plafond est atteint ou si OpenAI ne répond pas, la page
+  utilise la voix de l'appareil (qualité variable selon l'appareil).
+- L'audio est servi par l'API elle-même (`/api/ecole/voix/…`, réservé aux
+  personnes connectées) : la CSP de la page n'a pas besoin de changer.
+
 ## Garde-fous du tuteur
 
 - Consignes strictes : français simple, 120 mots au plus, méthode de l'école

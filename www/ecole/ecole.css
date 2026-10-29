@@ -155,6 +155,18 @@ select {
 .exemple-question { font-weight: 700; margin: 0 0 6px; }
 .etapes { margin: 0; padding-left: 1.4em; font-family: var(--chiffres); display: grid; gap: 4px; }
 
+/* Maîtresse virtuelle : boutons « Écouter » */
+.ecouter {
+  font: inherit; font-size: .95rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+  background: var(--etoile-fond); color: var(--texte); border: 2px solid var(--etoile);
+  border-radius: 999px; padding: 6px 14px; line-height: 1.2;
+}
+.ecouter:hover { filter: brightness(1.04); }
+.ecouter.petit { font-size: .8rem; padding: 2px 10px; margin-left: 6px; vertical-align: middle; font-family: var(--corps); }
+.ecouter.en-cours { background: var(--etoile); color: var(--carte); }
+.enonce-ligne { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.bulle .ecouter { display: block; margin-top: 6px; }
+
 /* Tuteur */
 .tuteur { margin-top: 28px; }
 .tuteur-intro { color: var(--doux); margin: -4px 0 12px; }
