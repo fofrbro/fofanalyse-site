@@ -1,7 +1,8 @@
 # Espace de révision du CM1 à la 6e (« Mon cahier »)
 
-`https://fofanalyse.com/ecole/` : un espace privé où Mouaz révise les maths et
-le français de sa classe (CM1, CM2 ou 6e). Pour chaque chapitre : une leçon courte, des séries de 8 exercices
+`https://fofanalyse.com/ecole/` : un espace privé où Mouaz révise toutes les
+matières de sa classe (CM1, CM2 ou 6e) : maths, français, sciences, histoire,
+géographie, anglais et enseignement moral et civique. Pour chaque chapitre : une leçon courte, des séries de 8 exercices
 interactifs qui s'adaptent à son niveau, une correction pas à pas, et un
 tuteur IA qui réexplique quand il ne comprend pas. Le parent voit le suivi.
 
@@ -15,6 +16,7 @@ la bonne réponse :
 | `exercices.py`, `exercices_cm2.py`, `exercices_6e.py` | tirent chaque exercice au hasard, le résolvent (Decimal pour les virgules), écrivent la correction étape par étape |
 | `conjugaison.py` | calcule les formes des verbes (1er et 2e groupes, 15 irréguliers, 8 temps, accord avec « être ») |
 | `francais.py`, `francais_banques.py` | exercices de français : conjugaison et accords calculés, grammaire, homophones et vocabulaire tirés de banques vérifiées à la main |
+| `quiz.py`, `quiz_*.py` | sciences, histoire, géographie, anglais, EMC : leçons et banques de questions écrites et vérifiées à la main |
 | `catalogue.py` | réunit les générateurs de toutes les classes et tire une série |
 | `stockage.py` | garde la classe choisie, les réponses et le niveau de chaque chapitre (SQLite) |
 | `tuteur.py` | réexplique *autrement*, en recevant la leçon, la bonne réponse calculée et la réponse de l'enfant ; il connaît sa classe et son âge |
@@ -54,6 +56,19 @@ l'orthographe), pas la casse ni le point final. Une rangée de lettres
 accentuées aide à les taper. Les verbes à radical changeant (acheter,
 appeler, préférer, payer…) ne sont pas proposés : le moteur ne les couvre
 pas, plutôt que de risquer une forme fausse.
+
+**Sciences, histoire, géographie, anglais, EMC** (onglets sur l'accueil) —
+3 chapitres par matière et par classe (2 en EMC), qui suivent les thèmes du
+programme du cycle 3 : par exemple, en histoire, « Et avant la France ? »,
+« Le temps des rois », « La Révolution et l'Empire » au CM1. Chaque chapitre a
+sa leçon et au moins 10 questions réparties sur les 3 niveaux. Il n'y a rien
+à calculer : la bonne réponse est écrite dans la banque, avec son
+explication. En anglais, le vocabulaire se tape au clavier (« a », « an »,
+« the » acceptés devant le mot).
+
+**À relire par un adulte** : ces contenus sont écrits à la main ; le code
+vérifie leur cohérence (pas de doublon, la bonne réponse n'est pas parmi
+les mauvaises, chaque niveau est représenté), pas leur exactitude.
 
 **Changer de classe** : le parent choisit la classe dans « Suivi » (rien à
 redéployer). `ECOLE_CLASSE` ne sert qu'au tout premier démarrage. Les

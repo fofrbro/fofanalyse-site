@@ -175,8 +175,9 @@ def test_parcours_eleve(client):
     assert se_connecter(client) == {"role": "eleve", "prenom": "Mouaz", "tuteur": True, "voix": False,
                                     "classe": "CM1"}
     prog = client.get("/api/ecole/programme").json()
-    assert len(prog["chapitres"]) == 16 and prog["progres"]["tables"]["niveau"] == 1
-    assert {c["matiere"] for c in prog["chapitres"]} == {"maths", "francais"}
+    assert prog["progres"]["tables"]["niveau"] == 1
+    assert {c["matiere"] for c in prog["chapitres"]} == set(lecons.MATIERES)
+    assert all("questions" not in c for c in prog["chapitres"])  # les réponses ne partent jamais au navigateur
 
     serie = client.post("/api/ecole/serie", json={"chapitre": "tables"}).json()
     assert len(serie["exercices"]) == 8
@@ -455,3 +456,29 @@ def test_tuteur_connait_la_matiere(client):
     se_connecter(client)
     client.post("/api/ecole/tuteur", json={"chapitre": "fr-cm1-present", "question": "C'est quoi un verbe ?"})
     assert "Le présent" in client.tuteur.appels[-1][1]
+
+
+# --- Sciences, histoire, géographie, anglais, EMC ------------------------------------------------
+
+def test_banques_de_questions():
+    import quiz
+    for matiere, module in quiz.MODULES.items():
+        assert set(module.CHAPITRES) == set(lecons.CLASSES), matiere
+        for classe, chapitres in module.CHAPITRES.items():
+            for c in chapitres:
+                enonces = [q[0] for q in c["questions"]]
+                assert len(set(enonces)) == len(enonces) >= 10, c["id"]
+                assert {q[4] for q in c["questions"]} == {1, 2, 3}, c["id"]
+                for enonce, bonne, mauvaises, explication, niveau in c["questions"]:
+                    assert explication and enonce
+                    if isinstance(bonne, list):
+                        assert mauvaises is None and all(b == b.lower() for b in bonne), enonce
+                    else:
+                        assert bonne not in mauvaises and len(set(mauvaises)) == len(mauvaises) >= 2, enonce
+                assert c["retenir"] and c["exemple"]["etapes"]
+
+
+def test_une_serie_de_quiz_a_8_questions():
+    for chapitre in ("hist-cm1-gaule", "ang-6e-present", "emc-cm2-citoyen"):
+        for niveau in (1, 2, 3):
+            assert len(catalogue.serie(chapitre, niveau, 8, random.Random(niveau))) == 8
