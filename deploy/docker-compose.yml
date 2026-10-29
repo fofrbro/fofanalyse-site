@@ -1,5 +1,6 @@
 # Pile complète du serveur fofanalyse.com : un seul Caddy (HTTPS automatique)
-# pour le site, le formulaire de contact et la démo de l'agent.
+# pour le site, le formulaire de contact, l'espace de révision CM1 et la
+# démo de l'agent.
 #
 # Sur le serveur, les deux dépôts sont clonés côte à côte :
 #   /srv/fofanalyse-site         (ce dépôt)
@@ -19,6 +20,7 @@ services:
       - caddy_config:/config
     depends_on:
       - contact
+      - ecole
       - agent
     restart: unless-stopped
 
@@ -29,6 +31,24 @@ services:
     env_file:
       - path: .env
         required: false
+    expose:
+      - "8000"
+    mem_limit: 256m
+    restart: unless-stopped
+
+  ecole:
+    build:
+      context: ../ecole-service
+    # Codes d'accès, secret de session et clé OpenAI du tuteur dans deploy/.env.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ECOLE_DB: /data/ecole.db
+      ECOLE_SECURE_COOKIE: "true"
+    volumes:
+      # La progression de l'élève survit aux redémarrages et aux mises à jour.
+      - ecole_data:/data
     expose:
       - "8000"
     mem_limit: 256m
@@ -49,5 +69,6 @@ services:
     restart: unless-stopped
 
 volumes:
+  ecole_data:
   caddy_data:
   caddy_config:

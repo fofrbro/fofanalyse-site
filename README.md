@@ -13,7 +13,9 @@ www/                    pages publiques (seul dossier servi en ligne)
   assets/               style.css, favicon.svg (et plus tard photo.jpg)
   cv/                   CV téléchargeable en PDF (sans numéro de téléphone)
 cv-source/cv.html       source du CV publié
+  ecole/                espace de révision CM1 (privé, par code) : index, ecole.css, ecole.js
 contact-service/        service du formulaire de contact (FastAPI, tests)
+ecole-service/          API de l'espace de révision : exercices, progression, tuteur IA (tests)
 deploy/                 mise en ligne : Docker, Caddy, guide pas à pas
 ```
 
@@ -42,6 +44,18 @@ Tests (SMTP simulé, aucun envoi réel) :
 
 ```bash
 cd contact-service && python -m pytest -q
+```
+
+## Espace de révision CM1
+
+`https://fofanalyse.com/ecole/` : un cahier de maths de CM1 pour Mouaz, privé
+(code élève, code parent). Dix chapitres du programme, avec pour chacun une
+leçon, des séries d'exercices qui s'adaptent à son niveau et un tuteur IA qui
+réexplique. Le parent voit le suivi. Détails dans
+[ecole-service/README.md](ecole-service/README.md).
+
+```bash
+cd ecole-service && python -m pytest -q
 ```
 
 ## Régénérer le CV en PDF

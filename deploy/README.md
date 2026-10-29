@@ -117,7 +117,21 @@ CONTACT_TO=cheikhou@fofanalyse.com
 
 # Démo de l'agent (facultatif) : clé d'un projet OpenAI dédié, plafonné
 OPENAI_API_KEY=cle-du-projet-openai-de-la-demo
+
+# Espace de révision CM1 (/ecole/)
+ECOLE_CODE_ELEVE=code-de-mouaz
+ECOLE_CODE_PARENT=code-du-parent-different
+ECOLE_SECRET=coller-ici-le-resultat-de-openssl-rand-hex-32
+ECOLE_PRENOM=Mouaz
+# Tuteur IA (facultatif) : un AUTRE projet OpenAI que la démo, plafonné
+ECOLE_OPENAI_API_KEY=cle-du-projet-openai-du-tuteur
+ECOLE_OPENAI_MODEL=gpt-4o-mini
+ECOLE_IA_PAR_JOUR=60
 ```
+
+Le secret de session se génère sur le serveur avec `openssl rand -hex 32`.
+Sans les trois premières lignes `ECOLE_…`, le service `ecole` refuse de
+démarrer (message clair dans `docker compose logs ecole`).
 
 ```bash
 chmod 600 .env
@@ -132,6 +146,10 @@ chmod 600 .env
 - **OpenAI** : un projet dédié à la démo avec une **limite de dépense
   mensuelle** (par exemple 10 $). Sans clé, la démo fonctionne sans les
   fonctions LLM.
+- **Tuteur de l'espace de révision** : un second projet OpenAI, avec sa
+  propre limite mensuelle (par exemple 5 $), pour suivre son coût à part.
+  `ECOLE_IA_PAR_JOUR` borne en plus le nombre de questions par jour. Sans
+  clé, les leçons et les exercices fonctionnent ; seul le tuteur est absent.
 
 ## 6. Lancer et vérifier
 
@@ -163,6 +181,19 @@ Puis, dans un navigateur :
    avec « Répondre à » sur l'adresse saisie ;
 3. `https://demo.fofanalyse.com` : charger un exemple, préparer le plan,
    valider le contrat, exécuter.
+4. `https://fofanalyse.com/ecole/` : entrer le code parent, ouvrir un
+   chapitre, poser une question au tuteur, faire une série, puis ouvrir
+   « Suivi ».
+
+```bash
+curl -s https://fofanalyse.com/api/ecole/health
+```
+
+La progression est dans le volume Docker `deploy_ecole_data`. Sauvegarde :
+
+```bash
+docker compose exec ecole python -c "import sqlite3; sqlite3.connect('/data/ecole.db').backup(sqlite3.connect('/data/sauvegarde.db'))" && docker compose cp ecole:/data/sauvegarde.db ~/ecole-$(date +%F).db
+```
 
 ## 7. Mettre à jour
 

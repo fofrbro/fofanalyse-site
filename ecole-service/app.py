@@ -1,0 +1,276 @@
+"""
+Service « École » de fofanalyse.com : l'espace de révision de CM1.
+
+Servi par Caddy sous https://fofanalyse.com/api/ecole/ ; la page est dans
+www/ecole/. Accès privé par code : un code élève, un code parent (le parent
+voit en plus le suivi). Aucune donnée personnelle hormis le prénom affiché.
+
+Configuration (deploy/.env) :
+  ECOLE_CODE_ELEVE, ECOLE_CODE_PARENT   codes d'accès (obligatoires)
+  ECOLE_SECRET                          clé de signature des sessions (obligatoire)
+  ECOLE_OPENAI_API_KEY                  clé du projet OpenAI du tuteur (facultatif)
+  ECOLE_OPENAI_MODEL                    modèle (défaut : gpt-4o-mini)
+  ECOLE_IA_PAR_JOUR                     plafond d'appels au tuteur par jour (défaut : 60)
+  ECOLE_PRENOM                          prénom de l'élève (défaut : Mouaz)
+  ECOLE_DB                              fichier SQLite (défaut : /data/ecole.db)
+  ECOLE_SECURE_COOKIE                   true en ligne (HTTPS), false en local
+"""
+
+import base64
+import hashlib
+import hmac
+import json
+import os
+import secrets
+import time
+from collections import defaultdict, deque
+
+from starlette.applications import Starlette
+from starlette.concurrency import run_in_threadpool
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.routing import Route
+
+import exercices as E
+import lecons
+from stockage import Stockage
+from tuteur import REPONSE_BLOQUEE, TuteurIndisponible, depuis_environnement
+
+COOKIE = "ecole_session"
+DUREE_SESSION = 30 * 86400
+CHAMPS_PUBLICS = ("type", "enonce", "grand", "unite", "champs", "options", "indice")
+
+
+class Config:
+    def __init__(self, env=os.environ):
+        self.code_eleve = env.get("ECOLE_CODE_ELEVE", "")
+        self.code_parent = env.get("ECOLE_CODE_PARENT", "")
+        self.secret = env.get("ECOLE_SECRET", "")
+        self.prenom = env.get("ECOLE_PRENOM", "Mouaz")
+        self.ia_par_jour = int(env.get("ECOLE_IA_PAR_JOUR", "60"))
+        self.db = env.get("ECOLE_DB", "/data/ecole.db")
+        self.cookie_securise = env.get("ECOLE_SECURE_COOKIE", "true").lower() != "false"
+        if len(self.secret) < 16 or len(self.code_eleve) < 4 or len(self.code_parent) < 4:
+            raise RuntimeError("ECOLE_SECRET (16 caractères min.), ECOLE_CODE_ELEVE et ECOLE_CODE_PARENT "
+                               "(4 caractères min.) doivent être définis dans deploy/.env")
+        if self.code_eleve == self.code_parent:
+            raise RuntimeError("ECOLE_CODE_ELEVE et ECOLE_CODE_PARENT doivent être différents")
+
+
+def erreur(message, statut=400):
+    return JSONResponse({"erreur": message}, status_code=statut)
+
+
+# --- Sessions signées -----------------------------------------------------
+
+def signer(secret: str, contenu: dict) -> str:
+    corps = base64.urlsafe_b64encode(json.dumps(contenu).encode()).decode().rstrip("=")
+    signature = hmac.new(secret.encode(), corps.encode(), hashlib.sha256).hexdigest()
+    return f"{corps}.{signature}"
+
+
+def verifier_session(secret: str, valeur: str | None) -> dict | None:
+    if not valeur or "." not in valeur:
+        return None
+    corps, signature = valeur.rsplit(".", 1)
+    attendu = hmac.new(secret.encode(), corps.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, attendu):
+        return None
+    try:
+        contenu = json.loads(base64.urlsafe_b64decode(corps + "=" * (-len(corps) % 4)))
+    except ValueError:
+        return None
+    if contenu.get("exp", 0) < time.time() or contenu.get("role") not in ("eleve", "parent"):
+        return None
+    return contenu
+
+
+def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
+    config = config or Config()
+    tuteur = tuteur or depuis_environnement()
+    stock = Stockage(config.db)
+    echecs = defaultdict(deque)  # adresse IP → instants des codes faux
+
+    def adresse(request: Request) -> str:
+        transmise = request.headers.get("x-forwarded-for", "")
+        return transmise.split(",")[0].strip() or (request.client.host if request.client else "?")
+
+    def session(request: Request):
+        return verifier_session(config.secret, request.cookies.get(COOKIE))
+
+    async def corps_json(request: Request) -> dict | None:
+        if "application/json" not in request.headers.get("content-type", ""):
+            return None
+        brut = await request.body()
+        if len(brut) > 32_000:
+            return None
+        try:
+            donnees = json.loads(brut)
+        except ValueError:
+            return None
+        return donnees if isinstance(donnees, dict) else None
+
+    def protege(role_requis=None):
+        def decorateur(fonction):
+            async def route(request: Request):
+                s = session(request)
+                if not s:
+                    return erreur("Connecte-toi avec ton code.", 401)
+                if role_requis and s["role"] != role_requis:
+                    return erreur("Réservé au parent.", 403)
+                request.state.role = s["role"]
+                return await fonction(request)
+            return route
+        return decorateur
+
+    # --- Connexion --------------------------------------------------------
+
+    async def connexion(request: Request):
+        ip = adresse(request)
+        file = echecs[ip]
+        while file and file[0] < time.time() - 900:
+            file.popleft()
+        if len(file) >= 8:
+            return erreur("Trop d'essais. Attends un quart d'heure.", 429)
+        donnees = await corps_json(request) or {}
+        code = str(donnees.get("code", ""))[:64].strip()
+        if hmac.compare_digest(code.encode(), config.code_parent.encode()):
+            role = "parent"
+        elif hmac.compare_digest(code.encode(), config.code_eleve.encode()):
+            role = "eleve"
+        else:
+            file.append(time.time())
+            return erreur("Ce code n'est pas le bon.", 401)
+        r = JSONResponse({"role": role, "prenom": config.prenom, "tuteur": tuteur.actif})
+        r.set_cookie(COOKIE, signer(config.secret, {"role": role, "exp": int(time.time()) + DUREE_SESSION}),
+                     max_age=DUREE_SESSION, httponly=True, secure=config.cookie_securise,
+                     samesite="strict", path="/api/ecole")
+        return r
+
+    async def deconnexion(request: Request):
+        r = JSONResponse({"ok": True})
+        r.delete_cookie(COOKIE, path="/api/ecole")
+        return r
+
+    @protege()
+    async def moi(request: Request):
+        return JSONResponse({"role": request.state.role, "prenom": config.prenom, "tuteur": tuteur.actif})
+
+    # --- Leçons et exercices ------------------------------------------------
+
+    @protege()
+    async def programme(request: Request):
+        ids = [c["id"] for c in lecons.CHAPITRES]
+        return JSONResponse({"chapitres": lecons.CHAPITRES, "progres": stock.progres_eleve(ids)})
+
+    @protege()
+    async def serie(request: Request):
+        donnees = await corps_json(request) or {}
+        chapitre = donnees.get("chapitre")
+        if chapitre not in lecons.PAR_ID:
+            return erreur("Chapitre inconnu.")
+        niveau = stock.niveau(chapitre)
+        liste = []
+        for ex in E.serie(chapitre, niveau, 8, prenom=config.prenom):
+            id_ = secrets.token_urlsafe(12)
+            stock.enregistrer_exercice(id_, chapitre, niveau, ex)
+            liste.append({"id": id_, **{k: ex[k] for k in CHAMPS_PUBLICS}})
+        return JSONResponse({"chapitre": chapitre, "niveau": niveau, "exercices": liste})
+
+    @protege()
+    async def reponse(request: Request):
+        donnees = await corps_json(request) or {}
+        ligne = stock.exercice(str(donnees.get("id", "")))
+        if not ligne:
+            return erreur("Exercice introuvable.", 404)
+        if ligne["termine"]:
+            return erreur("Cet exercice est déjà terminé.", 409)
+        reponse_eleve = donnees.get("reponse")
+        if isinstance(reponse_eleve, list):
+            reponse_eleve = [str(r)[:20] for r in reponse_eleve[:8]]
+        else:
+            reponse_eleve = str(reponse_eleve or "")[:40]
+        ex = ligne["donnees"]
+        correct = E.verifier(ex, reponse_eleve)
+        etat = stock.noter_essai(ligne["id"], correct, reponse_eleve)
+        resultat = {"correct": correct, "essais": etat["essais"], "termine": etat["termine"]}
+        if etat["termine"]:
+            resultat["reponse_texte"] = ex["reponse_texte"]
+            resultat["explication"] = ex["explication"]
+            nouveau = stock.ajuster_niveau(etat["chapitre"])
+            if nouveau:
+                resultat["nouveau_niveau"] = nouveau
+        return JSONResponse(resultat)
+
+    # --- Tuteur IA -----------------------------------------------------------
+
+    async def appeler_tuteur(fonction, *args):
+        if not tuteur.actif:
+            return erreur("Le tuteur n'est pas encore branché.", 503)
+        if not stock.compter_appel_ia(config.ia_par_jour):
+            return erreur("Le tuteur se repose pour aujourd'hui. Reviens demain !", 429)
+        try:
+            texte = await run_in_threadpool(fonction, *args)
+        except TuteurIndisponible:
+            return erreur("Le tuteur ne répond pas. Réessaie dans un moment.", 502)
+        return JSONResponse({"reponse": texte})
+
+    @protege()
+    async def poser_question(request: Request):
+        donnees = await corps_json(request) or {}
+        chapitre = donnees.get("chapitre")
+        question = str(donnees.get("question", "")).strip()
+        historique = donnees.get("historique") if isinstance(donnees.get("historique"), list) else []
+        if chapitre not in lecons.PAR_ID or not question:
+            return erreur("Écris ta question.")
+        if len(question) > 400:
+            return erreur("Ta question est trop longue : 400 caractères au maximum.")
+        if tuteur.actif and not await run_in_threadpool(tuteur.message_autorise, question):
+            stock.noter_question(chapitre, question, bloquee=True)
+            return JSONResponse({"reponse": REPONSE_BLOQUEE})
+        stock.noter_question(chapitre, question)
+        return await appeler_tuteur(tuteur.repondre, lecons.lecon_en_texte(chapitre), question, historique)
+
+    @protege()
+    async def autrement(request: Request):
+        donnees = await corps_json(request) or {}
+        ligne = stock.exercice(str(donnees.get("id", "")))
+        if not ligne or not ligne["termine"]:
+            return erreur("Termine d'abord l'exercice.", 409)
+        reponse_eleve = json.loads(ligne["derniere_reponse"] or '""')
+        return await appeler_tuteur(tuteur.reexpliquer, lecons.lecon_en_texte(ligne["chapitre"]),
+                                    ligne["donnees"], reponse_eleve)
+
+    # --- Parent ------------------------------------------------------------------
+
+    @protege("parent")
+    async def suivi(request: Request):
+        ids = [c["id"] for c in lecons.CHAPITRES]
+        return JSONResponse({**stock.suivi_parent(ids), "plafond_ia": config.ia_par_jour, "tuteur": tuteur.actif})
+
+    @protege("parent")
+    async def effacer(request: Request):
+        donnees = await corps_json(request) or {}
+        if donnees.get("confirmation") != "EFFACER":
+            return erreur("Confirmation manquante.")
+        stock.tout_effacer()
+        return JSONResponse({"ok": True})
+
+    async def sante(request: Request):
+        return JSONResponse({"ok": True})
+
+    p = "/api/ecole"
+    return Starlette(routes=[
+        Route(f"{p}/health", sante),
+        Route(f"{p}/connexion", connexion, methods=["POST"]),
+        Route(f"{p}/deconnexion", deconnexion, methods=["POST"]),
+        Route(f"{p}/moi", moi),
+        Route(f"{p}/programme", programme),
+        Route(f"{p}/serie", serie, methods=["POST"]),
+        Route(f"{p}/reponse", reponse, methods=["POST"]),
+        Route(f"{p}/tuteur", poser_question, methods=["POST"]),
+        Route(f"{p}/autrement", autrement, methods=["POST"]),
+        Route(f"{p}/suivi", suivi),
+        Route(f"{p}/effacer", effacer, methods=["POST"]),
+    ])
+
