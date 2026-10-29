@@ -8,7 +8,7 @@ const API = "/api/ecole";
 const $ = (id) => document.getElementById(id);
 
 const etat = {
-  role: null, prenom: "", tuteur: false,
+  role: null, prenom: "", tuteur: false, voix: false,
   classe: "", classes: [],   // classe choisie par le parent, et toutes les classes
   chapitres: [], progres: {}, // chapitres de la classe et des classes d'avant
   chapitre: null,            // chapitre ouvert
@@ -76,6 +76,81 @@ function etoilesTotal() {
   $("etoiles-total").textContent = `★ ${total}`;
 }
 
+// --- Maîtresse virtuelle : lecture à voix haute ----------------------------
+// La voix d'OpenAI passe par le serveur (qui garde les audios en cache) ;
+// sans elle, ou si elle ne répond pas, la voix du navigateur prend le relais.
+
+const lecteur = new Audio();
+let boutonEnCours = null;
+
+function arreterLecture() {
+  lecteur.pause();
+  lecteur.removeAttribute("src");
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  if (boutonEnCours) boutonEnCours.classList.remove("en-cours");
+  boutonEnCours = null;
+}
+
+function voixDuNavigateur(texte, bouton) {
+  if (!("speechSynthesis" in window)) return arreterLecture();
+  const phrase = new SpeechSynthesisUtterance(texte);
+  phrase.lang = "fr-FR";
+  phrase.rate = 0.9;
+  const francaise = speechSynthesis.getVoices().find((v) => v.lang.startsWith("fr"));
+  if (francaise) phrase.voice = francaise;
+  phrase.onend = () => { if (boutonEnCours === bouton) arreterLecture(); };
+  speechSynthesis.speak(phrase);
+}
+
+async function lire(texte, bouton) {
+  const memeBouton = boutonEnCours === bouton;
+  arreterLecture();
+  if (memeBouton || !texte.trim()) return;  // deuxième clic : on arrête
+  boutonEnCours = bouton;
+  bouton.classList.add("en-cours");
+  if (etat.voix) {
+    try {
+      const r = await api("/voix", { texte });
+      if (boutonEnCours !== bouton) return;  // un autre bouton a été cliqué entre-temps
+      lecteur.src = r.audio;
+      await lecteur.play();
+      return;
+    } catch {
+      if (boutonEnCours !== bouton) return;
+    }
+  }
+  voixDuNavigateur(texte, bouton);
+}
+
+lecteur.addEventListener("ended", arreterLecture);
+
+function boutonEcouter(texte, libelle = "🔊 Écouter") {
+  const b = el("button", "ecouter petit", libelle);
+  b.type = "button";
+  b.addEventListener("click", () => lire(texte, b));
+  return b;
+}
+
+function texteLecon(c) {
+  return [c.titre + ".", c.resume, "À retenir.", ...c.retenir, "Exemple.", c.exemple.question, ...c.exemple.etapes]
+    .join("\n");
+}
+
+function texteEnonce(ex) {
+  let texte = ex.enonce;
+  if (ex.type === "choix") texte += `\nRéponses possibles : ${ex.options.join(", ou ")}.`;
+  if (ex.type === "multi") texte += `\nÉcris : ${ex.champs.map((c) => c.label).join(", puis ")}.`;
+  if (ex.unite && ex.type === "nombre") texte += `\nRéponds en ${ex.unite}.`;
+  return texte;
+}
+
+$("ecouter-lecon").addEventListener("click", (e) => lire(texteLecon(etat.chapitre), e.currentTarget));
+$("ecouter-enonce").addEventListener("click", (e) => lire(texteEnonce(etat.exercice), e.currentTarget));
+$("ecouter-correction").addEventListener("click", (e) =>
+  lire(`${$("retour-reponse").textContent}\n${$("correction-texte").textContent}`, e.currentTarget));
+$("ecouter-autrement").addEventListener("click", (e) => lire($("autrement-texte").textContent, e.currentTarget));
+window.addEventListener("hashchange", arreterLecture);
+
 // --- Connexion ----------------------------------------------------------
 
 $("form-connexion").addEventListener("submit", async (e) => {
@@ -84,7 +159,7 @@ $("form-connexion").addEventListener("submit", async (e) => {
   message.textContent = "";
   try {
     const r = await api("/connexion", { code: $("code").value });
-    Object.assign(etat, { role: r.role, prenom: r.prenom, tuteur: r.tuteur, classe: r.classe });
+    Object.assign(etat, { role: r.role, prenom: r.prenom, tuteur: r.tuteur, voix: r.voix, classe: r.classe });
     $("code").value = "";
     await chargerProgramme();
     router();
@@ -204,8 +279,11 @@ function afficherChapitre(c) {
 
 function dessinerFil(attente = false) {
   const fil = $("fil");
-  fil.replaceChildren(...etat.fil.map((m) =>
-    el("p", `bulle ${m.role === "user" ? "eleve" : "ia"}${m.erreur ? " erreur" : ""}`, m.content)));
+  fil.replaceChildren(...etat.fil.map((m) => {
+    const bulle = el("p", `bulle ${m.role === "user" ? "eleve" : "ia"}${m.erreur ? " erreur" : ""}`, m.content);
+    if (m.role === "assistant" && !m.erreur) bulle.append(boutonEcouter(m.content));
+    return bulle;
+  }));
   if (attente) fil.append(el("p", "bulle ia attente", "Ton tuteur réfléchit…"));
 }
 
@@ -258,6 +336,7 @@ $("commencer").addEventListener("click", commencerSerie);
 $("encore").addEventListener("click", commencerSerie);
 
 function afficherExercice() {
+  arreterLecture();
   const ex = etat.serie[etat.position];
   etat.exercice = ex;
   const total = etat.serie.length;
@@ -436,7 +515,9 @@ async function afficherSuivi() {
     `${total} exercice${total > 1 ? "s" : ""} au total, dont ${semaine} ces 7 derniers jours. ` +
     (faibles.length ? `À revoir : ${faibles.join(", ")}. ` : "") +
     (s.tuteur ? `Tuteur : ${s.appels_ia_aujourdhui} appel${s.appels_ia_aujourdhui > 1 ? "s" : ""} aujourd'hui sur ${s.plafond_ia} autorisés.`
-              : "Tuteur non branché (clé OpenAI absente).");
+              : "Tuteur non branché (clé OpenAI absente).") +
+    (s.voix ? ` Voix : ${s.appels_voix_aujourdhui} audio${s.appels_voix_aujourdhui > 1 ? "s" : ""} nouveau${s.appels_voix_aujourdhui > 1 ? "x" : ""} aujourd'hui sur ${s.plafond_voix} (ceux déjà écoutés sont gratuits).`
+            : " Voix d'OpenAI non branchée : la page utilise la voix de l'appareil.");
 
   const max = Math.max(1, ...s.jours.map((j) => j.exercices));
   $("activite").replaceChildren(...s.jours.map((j) => {
@@ -535,7 +616,7 @@ window.addEventListener("hashchange", router);
 (async function demarrer() {
   try {
     const moi = await api("/moi");
-    Object.assign(etat, { role: moi.role, prenom: moi.prenom, tuteur: moi.tuteur, classe: moi.classe });
+    Object.assign(etat, { role: moi.role, prenom: moi.prenom, tuteur: moi.tuteur, voix: moi.voix, classe: moi.classe });
     await chargerProgramme();
   } catch {
     etat.role = null;

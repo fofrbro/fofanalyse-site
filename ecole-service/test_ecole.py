@@ -168,7 +168,8 @@ def test_trop_de_codes_faux(client):
 
 
 def test_parcours_eleve(client):
-    assert se_connecter(client) == {"role": "eleve", "prenom": "Mouaz", "tuteur": True, "classe": "CM1"}
+    assert se_connecter(client) == {"role": "eleve", "prenom": "Mouaz", "tuteur": True, "voix": False,
+                                    "classe": "CM1"}
     prog = client.get("/api/ecole/programme").json()
     assert len(prog["chapitres"]) == 10 and prog["progres"]["tables"]["niveau"] == 1
 
@@ -324,3 +325,74 @@ def test_classe_de_depart_et_consignes(tmp_path):
     assert len(c.get("/api/ecole/programme").json()["chapitres"]) == len(lecons.CHAPITRES)
     from tuteur import consignes
     assert "élève de 6e (11 ans)" in consignes("Mouaz", "6e", 11)
+
+
+# --- Maîtresse virtuelle (voix) ---------------------------------------------------------
+
+def test_texte_reecrit_pour_la_voix():
+    from voix import pour_la_voix
+    assert pour_la_voix("47 × 23 = 1 081") == "47 fois 23 égale 1081"
+    assert pour_la_voix("3/4 + 1/4 = 4/4") == "3 quarts plus 1 quart égale 4 quarts"
+    assert pour_la_voix("Les 2/3 de 18") == "Les 2 tiers de 18"
+    assert pour_la_voix("12/9 − 1/9 = …/9") == "12 sur 9 moins 1 sur 9 égale combien sur 9"
+    assert pour_la_voix("Aire : 28 cm²") == "Aire : 28 centimètres carrés"
+    assert pour_la_voix("36 408 ≈ 36 000 ✓") == "36408 environ 36000"
+    assert pour_la_voix("Ligne 1\nLigne 2") == "Ligne 1. Ligne 2"
+    assert pour_la_voix("2,5 km") == "2,5 km"
+
+
+class FausseVoix:
+    def __init__(self, dossier):
+        from voix import Voix
+        self.vraie = Voix("cle", "modele", "coral", str(dossier))
+        self.active = True
+        self.generes = []
+
+    def nom(self, texte, age):
+        return self.vraie.nom(texte, age)
+
+    def chemin(self, nom):
+        return self.vraie.chemin(nom)
+
+    def deja_lu(self, nom):
+        return self.vraie.deja_lu(nom)
+
+    def generer(self, texte, age):
+        self.generes.append((texte, age))
+        nom = self.nom(texte, age)
+        self.vraie.dossier.mkdir(parents=True, exist_ok=True)
+        self.chemin(nom).write_bytes(b"ID3 faux mp3")
+        return nom
+
+
+def test_voix_cache_et_plafond(tmp_path):
+    env = {**ENV, "ECOLE_DB": str(tmp_path / "ecole.db"), "ECOLE_VOIX_PAR_JOUR": "2"}
+    voix = FausseVoix(tmp_path / "voix")
+    c = TestClient(creer_app(Config(env), FauxTuteur(), voix), base_url="http://test")
+    assert c.post("/api/ecole/voix", json={"texte": "Bonjour"}).status_code == 401
+    assert se_connecter(c)["voix"] is True
+
+    r = c.post("/api/ecole/voix", json={"texte": "7 × 8"}).json()
+    assert voix.generes == [("7 fois 8", 9)]
+    audio = c.get(r["audio"])
+    assert audio.status_code == 200 and audio.headers["content-type"] == "audio/mpeg"
+
+    # Déjà lu : servi depuis le cache, sans nouvel appel ni décompte
+    assert c.post("/api/ecole/voix", json={"texte": "7 × 8"}).json() == r
+    assert len(voix.generes) == 1
+    c.post("/api/ecole/voix", json={"texte": "Deuxième texte"})
+    assert c.post("/api/ecole/voix", json={"texte": "Troisième texte"}).status_code == 429
+    assert c.post("/api/ecole/voix", json={"texte": "7 × 8"}).status_code == 200  # le cache reste gratuit
+
+    assert c.get("/api/ecole/voix/" + "0" * 64).status_code == 404
+    assert c.get("/api/ecole/voix/..%2Fecole.db").status_code == 404
+    assert c.post("/api/ecole/voix", json={"texte": "   "}).status_code == 400
+
+    se_connecter(c, "papa-2026")
+    suivi = c.get("/api/ecole/suivi").json()
+    assert suivi["appels_voix_aujourdhui"] == 2 and suivi["plafond_voix"] == 2
+
+
+def test_voix_absente_sans_cle(client):
+    se_connecter(client)
+    assert client.post("/api/ecole/voix", json={"texte": "Bonjour"}).status_code == 503

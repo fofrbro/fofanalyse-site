@@ -60,6 +60,7 @@
 
       <div class="actions-chapitre">
         <button class="bouton gros" id="commencer" type="button">Faire les exercices</button>
+        <button class="ecouter" id="ecouter-lecon" type="button">🔊 Écouter la leçon</button>
         <span class="niveau-texte" id="chap-niveau"></span>
       </div>
 
@@ -92,17 +93,20 @@
       </div>
       <div class="piste" aria-hidden="true"><div class="piste-remplie" id="piste"></div></div>
       <div class="carte" id="carte">
-        <p class="enonce" id="enonce"></p>
+        <div class="enonce-ligne">
+          <p class="enonce" id="enonce"></p>
+          <button class="ecouter" id="ecouter-enonce" type="button" aria-label="Écouter l'énoncé">🔊</button>
+        </div>
         <form id="form-reponse" class="zone-reponse"></form>
         <button class="lien" id="voir-indice" type="button">Voir un indice</button>
         <p class="indice" id="indice" hidden></p>
         <p class="retour-reponse" id="retour-reponse" aria-live="polite"></p>
         <div class="correction" id="correction" hidden>
-          <p class="correction-titre">Comment on fait</p>
+          <p class="correction-titre">Comment on fait <button class="ecouter petit" id="ecouter-correction" type="button">🔊 Écouter</button></p>
           <p class="correction-texte" id="correction-texte"></p>
         </div>
         <div class="autrement" id="autrement" hidden>
-          <p class="correction-titre">Ton tuteur t'explique autrement</p>
+          <p class="correction-titre">Ton tuteur t'explique autrement <button class="ecouter petit" id="ecouter-autrement" type="button">🔊 Écouter</button></p>
           <p class="correction-texte" id="autrement-texte"></p>
         </div>
         <div class="boutons-suite" id="boutons-suite" hidden>

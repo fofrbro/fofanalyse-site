@@ -129,6 +129,9 @@ ECOLE_CLASSE=CM1
 ECOLE_OPENAI_API_KEY=cle-du-projet-openai-du-tuteur
 ECOLE_OPENAI_MODEL=gpt-4o-mini
 ECOLE_IA_PAR_JOUR=60
+# Maîtresse virtuelle (voix d'OpenAI, même clé que le tuteur) ; les audios déjà écoutés sont gratuits
+ECOLE_VOIX=coral
+ECOLE_VOIX_PAR_JOUR=200
 ```
 
 Le secret de session se génère sur le serveur avec `openssl rand -hex 32`.

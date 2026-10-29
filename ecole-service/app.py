@@ -13,6 +13,9 @@ Configuration (deploy/.env) :
   ECOLE_OPENAI_API_KEY                  clé du projet OpenAI du tuteur (facultatif)
   ECOLE_OPENAI_MODEL                    modèle (défaut : gpt-4o-mini)
   ECOLE_IA_PAR_JOUR                     plafond d'appels au tuteur par jour (défaut : 60)
+  ECOLE_VOIX                            voix de la maîtresse virtuelle (défaut : coral)
+  ECOLE_VOIX_MODELE                     modèle de synthèse vocale (défaut : gpt-4o-mini-tts)
+  ECOLE_VOIX_PAR_JOUR                   plafond d'audios nouveaux par jour (défaut : 200 ; le cache est gratuit)
   ECOLE_PRENOM                          prénom de l'élève (défaut : Mouaz)
   ECOLE_CLASSE                          classe au premier démarrage : CM1, CM2 ou 6e (défaut : CM1) ;
                                         ensuite, le parent la change dans le suivi
@@ -32,13 +35,14 @@ from collections import defaultdict, deque
 from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Route
 
 import catalogue
 import exercices as E
 import lecons
 from stockage import Stockage
+import voix as V
 from tuteur import REPONSE_BLOQUEE, TuteurIndisponible, depuis_environnement
 
 COOKIE = "ecole_session"
@@ -54,6 +58,7 @@ class Config:
         self.prenom = env.get("ECOLE_PRENOM", "Mouaz")
         self.classe = env.get("ECOLE_CLASSE", "CM1")
         self.ia_par_jour = int(env.get("ECOLE_IA_PAR_JOUR", "60"))
+        self.voix_par_jour = int(env.get("ECOLE_VOIX_PAR_JOUR", "200"))
         self.db = env.get("ECOLE_DB", "/data/ecole.db")
         self.cookie_securise = env.get("ECOLE_SECURE_COOKIE", "true").lower() != "false"
         if len(self.secret) < 16 or len(self.code_eleve) < 4 or len(self.code_parent) < 4:
@@ -93,9 +98,10 @@ def verifier_session(secret: str, valeur: str | None) -> dict | None:
     return contenu
 
 
-def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
+def creer_app(config: Config | None = None, tuteur=None, voix=None) -> Starlette:
     config = config or Config()
     tuteur = tuteur or depuis_environnement()
+    voix = voix or V.depuis_environnement(config.db)
     stock = Stockage(config.db)
     echecs = defaultdict(deque)  # adresse IP → instants des codes faux
 
@@ -115,7 +121,8 @@ def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
         return {c["id"]: c for c in lecons.chapitres_jusqua(classe())}
 
     def profil(role) -> dict:
-        return {"role": role, "prenom": config.prenom, "tuteur": tuteur.actif, "classe": classe()}
+        return {"role": role, "prenom": config.prenom, "tuteur": tuteur.actif, "voix": voix.active,
+                "classe": classe()}
 
     def pour_tuteur() -> dict:
         return {"classe": classe(), "age": lecons.CLASSES[classe()]["age"]}
@@ -265,12 +272,43 @@ def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
         return await appeler_tuteur(tuteur.reexpliquer, lecons.lecon_en_texte(ligne["chapitre"]),
                                     ligne["donnees"], reponse_eleve, **pour_tuteur())
 
+    # --- Maîtresse virtuelle (voix) ---------------------------------------------
+
+    @protege()
+    async def lire_a_voix_haute(request: Request):
+        donnees = await corps_json(request) or {}
+        texte = V.pour_la_voix(str(donnees.get("texte", ""))[:V.MAX_TEXTE])
+        if not texte:
+            return erreur("Rien à lire.")
+        if not voix.active:
+            return erreur("La voix n'est pas branchée.", 503)
+        age = pour_tuteur()["age"]
+        nom = voix.nom(texte, age)
+        if not voix.deja_lu(nom):
+            if not stock.compter_appel_voix(config.voix_par_jour):
+                return erreur("La maîtresse a assez parlé pour aujourd'hui. Reviens demain !", 429)
+            try:
+                nom = await run_in_threadpool(voix.generer, texte, age)
+            except V.VoixIndisponible:
+                return erreur("La voix ne répond pas. Réessaie dans un moment.", 502)
+        return JSONResponse({"audio": f"/api/ecole/voix/{nom}"})
+
+    @protege()
+    async def audio(request: Request):
+        chemin = voix.chemin(request.path_params["nom"])
+        if not chemin or not chemin.exists():
+            return erreur("Audio introuvable.", 404)
+        return FileResponse(chemin, media_type="audio/mpeg",
+                            headers={"Cache-Control": "private, max-age=2592000, immutable"})
+
     # --- Parent ------------------------------------------------------------------
 
     @protege("parent")
     async def suivi(request: Request):
         ids = [c["id"] for c in lecons.chapitres_jusqua(classe())]
         return JSONResponse({**stock.suivi_parent(ids), "plafond_ia": config.ia_par_jour, "tuteur": tuteur.actif,
+                             "voix": voix.active, "appels_voix_aujourdhui": stock.appels_voix_aujourdhui(),
+                             "plafond_voix": config.voix_par_jour,
                              "classe": classe(), "classes": list(lecons.CLASSES)})
 
     @protege("parent")
@@ -304,6 +342,8 @@ def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
         Route(f"{p}/reponse", reponse, methods=["POST"]),
         Route(f"{p}/tuteur", poser_question, methods=["POST"]),
         Route(f"{p}/autrement", autrement, methods=["POST"]),
+        Route(f"{p}/voix", lire_a_voix_haute, methods=["POST"]),
+        Route(f"{p}/voix/{{nom}}", audio),
         Route(f"{p}/suivi", suivi),
         Route(f"{p}/classe", changer_classe, methods=["POST"]),
         Route(f"{p}/effacer", effacer, methods=["POST"]),
