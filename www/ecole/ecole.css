@@ -145,6 +145,7 @@ input:focus { outline: 3px solid var(--encre); outline-offset: 1px; }
   font: inherit; font-family: var(--titre); font-weight: 700; font-size: 1.1rem; cursor: pointer;
   background: var(--carte); color: var(--encre); border: 2px solid var(--encre); border-radius: 999px; padding: 6px 18px;
 }
+a.onglet { text-decoration: none; display: inline-block; }
 .onglet[aria-selected="true"] { background: var(--encre); color: var(--carte); }
 .zone-reponse input.mot { flex: 1 1 16rem; width: 16rem; font-family: var(--corps); font-size: 1.3rem; }
 .accents { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
@@ -201,6 +202,30 @@ select {
 .option { unicode-bidi: plaintext; }
 .enonce-ligne { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
 .bulle .ecouter { display: block; margin-top: 6px; }
+
+/* Coran */
+.sourate-arabe { margin: -6px 0 6px; font-family: "Arabe", system-ui, sans-serif; font-size: 1.8rem; color: var(--doux); }
+.reglages-coran { margin-bottom: 10px; }
+.case { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.versets { display: grid; gap: 10px; }
+.verset { background: var(--carte); border: 1.5px solid var(--bord); border-radius: var(--rayon); padding: 12px 16px; display: grid; gap: 6px; }
+.verset.appris { border-color: var(--ok); }
+.verset.focus { border: 2px solid var(--etoile); }
+.verset-arabe { margin: 0; font-family: "Arabe", system-ui, sans-serif; font-size: clamp(1.7rem, 6vw, 2.3rem); line-height: 2.1; text-align: right; }
+.verset-arabe.cache { filter: blur(9px); user-select: none; }
+.verset-fr { margin: 0; color: var(--doux); font-size: .95rem; }
+.verset-bas { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.numero-verset { font-family: var(--chiffres); font-weight: 700; color: var(--encre); background: var(--papier); border-radius: 99px; padding: 0 10px; }
+.professeur, .quiz-coran { margin-top: 22px; background: var(--etoile-fond); border: 2px solid var(--etoile); border-radius: var(--rayon); padding: 4px 16px 16px; display: grid; gap: 10px; }
+.professeur h2, .quiz-coran h2 { margin: 12px 0 0; }
+.prof-consigne { margin: 0; font-weight: 600; }
+.etapes-prof { display: flex; flex-wrap: wrap; gap: 8px; }
+.sources { margin-top: 24px; font-size: .82rem; }
+.options-versets { display: grid; gap: 8px; }
+.option-verset { font: inherit; text-align: right; cursor: pointer; background: var(--carte); border: 2px solid var(--bord); border-radius: 12px; padding: 8px 12px; }
+.option-verset .verset-arabe { font-size: 1.5rem; line-height: 1.9; }
+.option-verset.bonne { border-color: var(--ok); }
+.option-verset.fausse { border-color: var(--faux); opacity: .6; }
 
 /* Tuteur */
 .tuteur { margin-top: 28px; }

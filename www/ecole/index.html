@@ -126,6 +126,58 @@
       </div>
     </section>
 
+    <!-- Coran : la liste des sourates -->
+    <section id="vue-coran" class="vue" hidden>
+      <a class="retour" href="#accueil">← Les chapitres</a>
+      <h1>Le Coran</h1>
+      <p class="resume">Apprends par cœur Al-Fâtiha, puis le Juz 'Amma en commençant par la fin, avec ton professeur.</p>
+      <p class="message" id="coran-message" aria-live="polite"></p>
+      <div class="chapitres" id="liste-sourates"></div>
+      <p class="aide sources" id="coran-sources"></p>
+    </section>
+
+    <!-- Coran : une sourate -->
+    <section id="vue-sourate" class="vue" hidden>
+      <a class="retour" href="#coran">← Toutes les sourates</a>
+      <p class="surtitre" id="sourate-surtitre"></p>
+      <h1 id="sourate-titre"></h1>
+      <p class="sourate-arabe" id="sourate-nom-arabe" dir="rtl" lang="ar"></p>
+      <p class="resume" id="sourate-progres"></p>
+
+      <div class="ligne reglages-coran">
+        <label for="choix-recitant">Récitant</label>
+        <select id="choix-recitant"></select>
+        <label class="case"><input type="checkbox" id="voir-traduction"> Traduction</label>
+      </div>
+      <div class="ligne">
+        <button class="bouton" id="ecouter-sourate" type="button">▶ Toute la sourate</button>
+        <button class="bouton secondaire" id="arreter-coran" type="button">⏹ Arrêter</button>
+      </div>
+
+      <section class="professeur" aria-labelledby="titre-professeur">
+        <h2 id="titre-professeur">Ton professeur</h2>
+        <p class="prof-consigne" id="prof-consigne"></p>
+        <div class="verset focus" id="prof-verset"></div>
+        <div class="etapes-prof" id="prof-etapes">
+          <button class="bouton secondaire" id="prof-ecouter3" type="button">1. Écouter 3 fois</button>
+          <button class="bouton secondaire" id="prof-repeter" type="button">2. Écouter, puis répéter</button>
+          <button class="bouton secondaire" id="prof-cacher" type="button">3. Réciter sans regarder</button>
+          <button class="bouton" id="prof-retenu" type="button">4. Je l'ai retenu ✓</button>
+        </div>
+        <button class="lien" id="prof-depuis-debut" type="button">Réciter depuis le début avec le récitant</button>
+      </section>
+
+      <section class="quiz-coran" aria-labelledby="titre-quiz-coran">
+        <h2 id="titre-quiz-coran">Quel verset vient ensuite ?</h2>
+        <button class="bouton secondaire" id="quiz-coran-lancer" type="button">Une question</button>
+        <div id="quiz-coran"></div>
+      </section>
+
+      <h2>Les versets</h2>
+      <div class="versets" id="versets"></div>
+      <p class="aide sources" id="sourate-sources"></p>
+    </section>
+
     <!-- Suivi du parent -->
     <section id="vue-suivi" class="vue" hidden>
       <a class="retour" href="#accueil">← Les chapitres</a>
@@ -158,6 +210,9 @@
       <h2>Questions posées au tuteur</h2>
       <p class="aide">Les messages bloqués par le filtre de sécurité sont signalés en rouge.</p>
       <ul class="questions" id="suivi-questions"></ul>
+
+      <h2>Coran</h2>
+      <ul class="questions" id="suivi-coran"></ul>
 
       <h2>Repartir de zéro</h2>
       <p class="aide">Efface tous les exercices, les niveaux et les questions. Les leçons restent.</p>

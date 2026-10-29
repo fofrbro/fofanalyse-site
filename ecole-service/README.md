@@ -19,6 +19,7 @@ la bonne réponse :
 | `francais.py`, `francais_banques.py` | exercices de français : conjugaison et accords calculés, grammaire, homophones et vocabulaire tirés de banques vérifiées à la main |
 | `quiz.py`, `quiz_*.py` | sciences, histoire, géographie, anglais, EMC : leçons et banques de questions écrites et vérifiées à la main |
 | `arabe.py` | rubrique d'arabe : table des 28 lettres, formes attachées, voyelles, mots et phrases vocalisés |
+| `coran.py` | Coran : télécharge et vérifie le texte et la traduction, garde les récitations ; rien n'est généré |
 | `catalogue.py` | réunit les générateurs de toutes les classes et tire une série |
 | `stockage.py` | garde la classe choisie, les réponses et le niveau de chaque chapitre (SQLite) |
 | `tuteur.py` | réexplique *autrement*, en recevant la leçon, la bonne réponse calculée et la réponse de l'enfant ; il connaît sa classe et son âge |
@@ -76,6 +77,26 @@ questions sont construites à partir de la table des lettres et de listes de
 mots vocalisés avec leur transcription. Le texte arabe s'affiche en grand,
 de droite à gauche, et la voix le lit. La police arabe est celle de
 l'appareil (aucune ressource externe), agrandie pour être lisible.
+
+**Coran** (onglet « Coran ») — Al-Fâtiha, puis le Juz 'Amma de la fin vers le
+début (An-Nâs, Al-Falaq, Al-Ikhlâs… jusqu'à An-Naba'), 38 sourates.
+
+- Règle absolue : ni le code ni l'IA n'écrivent le texte du Coran, et la voix
+  de synthèse ne le lit jamais. Le tuteur IA n'intervient pas.
+- Texte : Tanzil (lecture Hafs, écriture othmanie), par l'API alquran.cloud ;
+  traduction de Muhammad Hamidullah, citée telle quelle. Le serveur les
+  télécharge à la première visite, vérifie le nombre de versets de chaque
+  sourate (refus si une seule ne correspond pas), sépare la basmala que l'API
+  colle au 1er verset, puis garde le tout dans `/data/coran/texte.json`.
+- Récitations : Mahmoud Khalil Al-Hussary (par défaut) ou Mishary Rashid
+  Alafasy, verset par verset depuis everyayah.com, téléchargées à la première
+  écoute puis gardées dans `/data/coran/audio`.
+- Le professeur : pour chaque verset, 1) écouter 3 fois, 2) écouter puis
+  répéter, 3) réciter sans regarder (le verset est flouté), 4) « Je l'ai
+  retenu », puis réciter depuis le début avec le récitant. Un quiz « Quel
+  verset vient ensuite ? » propose de vrais versets de la sourate. La
+  progression est gardée et visible dans le suivi ; « Tout effacer » ne
+  l'efface pas.
 
 **À relire par un adulte** : ces contenus sont écrits à la main ; le code
 vérifie leur cohérence (pas de doublon, la bonne réponse n'est pas parmi
