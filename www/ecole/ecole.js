@@ -689,6 +689,10 @@ async function afficherSuivi() {
               : "Tuteur non branché (clé OpenAI absente).") +
     (s.voix ? ` Voix : ${s.appels_voix_aujourdhui} audio${s.appels_voix_aujourdhui > 1 ? "s" : ""} nouveau${s.appels_voix_aujourdhui > 1 ? "x" : ""} aujourd'hui sur ${s.plafond_voix} (ceux déjà écoutés sont gratuits).`
             : " Voix d'OpenAI non branchée : la page utilise la voix de l'appareil.");
+  if (s.erreur_openai) {
+    const quand = new Date(s.erreur_openai.quand * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+    $("suivi-resume").textContent += ` Dernier échec d'OpenAI (${s.erreur_openai.service}, ${quand}) : ${s.erreur_openai.cause}`;
+  }
 
   const max = Math.max(1, ...s.jours.map((j) => j.exercices));
   $("activite").replaceChildren(...s.jours.map((j) => {
