@@ -8,6 +8,7 @@ francais.py et quiz.py (sciences, histoire, géographie, anglais, EMC).
 import random
 
 import arabe
+import argent
 import exercices
 import exercices_6e
 import exercices_cm2
@@ -15,7 +16,8 @@ import francais
 import quiz
 
 GENERATEURS = {**exercices.GENERATEURS, **exercices_cm2.GENERATEURS, **exercices_6e.GENERATEURS,
-               **francais.GENERATEURS, **quiz.GENERATEURS, **arabe.GENERATEURS}
+               **francais.GENERATEURS, **quiz.GENERATEURS, **arabe.GENERATEURS,
+               **argent.GENERATEURS}
 
 
 def generer(chapitre: str, niveau: int, rng: random.Random | None = None, prenom: str = "Mouaz") -> dict:

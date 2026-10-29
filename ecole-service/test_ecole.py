@@ -662,3 +662,25 @@ def test_cause_des_echecs_openai():
     finally:
         urllib.request.urlopen = ancien
     assert DERNIERE_ERREUR["service"] == "completions" and "429" in DERNIERE_ERREUR["cause"]
+
+
+# --- Argent (éducation financière) -------------------------------------------------------------------
+
+def test_calculs_d_argent_justes():
+    import argent as A
+    assert A.euros(1250) == "12,50 €" and A.euros(300) == "3 €" and A.euros(5) == "0,05 €"
+    assert A.nom_valeur(500, 2) == "billets de 5 €" and A.nom_valeur(20) == "pièce de 20 c"
+    rng = random.Random(5)
+    for _ in range(500):
+        ex = A.monnaie(rng, 3)
+        if "Combien la marchande" in ex["enonce"]:
+            prix, billet = re.search(r"à ([\d ,]+) € et tu paies avec un billet de (\d+) €", ex["enonce"]).groups()
+            assert Decimal(prix.replace(",", ".").replace(" ", "")) + Decimal(ex["reponse"]) == Decimal(billet)
+
+
+def test_argent_pour_toutes_les_classes(client):
+    se_connecter(client)
+    prog = client.get("/api/ecole/programme").json()
+    argent = [c for c in prog["chapitres"] if c["matiere"] == "argent"]
+    assert len(argent) == 6 and prog["matieres"]["argent"] == "Argent"
+    assert client.post("/api/ecole/serie", json={"chapitre": "arg-monnaie"}).status_code == 200
