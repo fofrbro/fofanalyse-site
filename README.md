@@ -48,7 +48,7 @@ cd contact-service && python -m pytest -q
 
 ## Espace de révision, du CM1 à la 6e
 
-`https://fofanalyse.com/ecole/` : un cahier de révision (maths et français) pour Mouaz, privé
+`https://fofanalyse.com/ecole/` : un cahier de révision (toutes les matières) pour Mouaz, privé
 (code élève, code parent). Le programme suit la classe choisie par le parent
 (CM1, CM2 ou 6e) ; les chapitres des années d'avant restent ouverts pour
 réviser. Pour chaque chapitre, une

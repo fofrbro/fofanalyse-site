@@ -15,6 +15,7 @@ d'exercices, et une ligne dans CLASSES ci-dessous et dans catalogue.py.
 import lecons_6e
 import lecons_cm2
 import lecons_francais
+import quiz
 
 CHAPITRES_CM1 = [
     {
@@ -198,17 +199,19 @@ CHAPITRES_CM1 = [
     },
 ]
 
-MATIERES = {"maths": "Mathématiques", "francais": "Français"}
+MATIERES = {"maths": "Mathématiques", "francais": "Français", **quiz.NOMS}
 MATHS = {"CM1": CHAPITRES_CM1, "CM2": lecons_cm2.CHAPITRES, "6e": lecons_6e.CHAPITRES}
+PAR_MATIERE = {"maths": MATHS, "francais": lecons_francais.PAR_CLASSE,
+               **{m: quiz.lecons_par_classe(m) for m in quiz.MODULES}}
 
-for _matiere, _par_classe in (("maths", MATHS), ("francais", lecons_francais.PAR_CLASSE)):
+for _matiere, _par_classe in PAR_MATIERE.items():
     for _classe, _chapitres in _par_classe.items():
         for _chapitre in _chapitres:
             _chapitre["classe"], _chapitre["matiere"] = _classe, _matiere
 
 # Les classes dans l'ordre de la scolarité, avec l'âge habituel (pour le tuteur).
 CLASSES = {
-    nom: {"age": age, "chapitres": MATHS[nom] + lecons_francais.PAR_CLASSE[nom]}
+    nom: {"age": age, "chapitres": [c for par_classe in PAR_MATIERE.values() for c in par_classe[nom]]}
     for nom, age in (("CM1", 9), ("CM2", 10), ("6e", 11))
 }
 

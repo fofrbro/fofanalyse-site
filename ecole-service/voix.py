@@ -94,7 +94,8 @@ class Voix:
 
     def consignes(self, age: int) -> str:
         return (f"Tu es une maîtresse d'école française, chaleureuse et calme, qui parle à un enfant de {age} ans. "
-                "Parle lentement et articule bien, surtout les nombres. Ton encourageant, jamais moqueur.")
+                "Parle lentement et articule bien, surtout les nombres. Ton encourageant, jamais moqueur. "
+                "Prononce les mots anglais avec un bon accent anglais.")
 
     def generer(self, texte: str, age: int) -> str:
         """Crée l'audio s'il n'existe pas encore. Renvoie son nom."""
