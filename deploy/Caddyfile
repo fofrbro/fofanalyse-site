@@ -24,7 +24,7 @@ fofanalyse.com {
 	@rag path /rag/* /acces/*
 	header @rag Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://fofanalyse-rag.fofanalyse.workers.dev https://fofanalyse-acces.fofanalyse.workers.dev; worker-src 'self' blob:; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
 
-	# Espace de révision CM1 (/ecole/) : script du site seulement, qui parle
+	# Espace de révision CM1 → 6e (/ecole/) : script du site seulement, qui parle
 	# à sa propre API (/api/ecole/). Page privée, à ne pas indexer.
 	@ecole path /ecole/*
 	header @ecole Content-Security-Policy "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"

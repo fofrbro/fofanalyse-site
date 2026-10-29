@@ -1,7 +1,7 @@
-# Espace de révision CM1 (« Mon cahier de maths »)
+# Espace de révision du CM1 à la 6e (« Mon cahier de maths »)
 
 `https://fofanalyse.com/ecole/` : un espace privé où Mouaz révise les maths de
-CM1. Pour chaque chapitre : une leçon courte, des séries de 8 exercices
+sa classe (CM1, CM2 ou 6e). Pour chaque chapitre : une leçon courte, des séries de 8 exercices
 interactifs qui s'adaptent à son niveau, une correction pas à pas, et un
 tuteur IA qui réexplique quand il ne comprend pas. Le parent voit le suivi.
 
@@ -12,17 +12,35 @@ la bonne réponse :
 
 | Qui | Fait quoi |
 |---|---|
-| `exercices.py` | tire chaque exercice au hasard, le résout, écrit la correction étape par étape (retenues comprises) |
-| `stockage.py` | garde les réponses et le niveau de chaque chapitre (SQLite) |
-| `tuteur.py` | réexplique *autrement*, en recevant la leçon, la bonne réponse calculée et la réponse de l'enfant |
-| `lecons.py` | les 10 leçons du programme, affichées sur la page et données au tuteur comme référence (à la manière d'un RAG) |
+| `exercices.py`, `exercices_cm2.py`, `exercices_6e.py` | tirent chaque exercice au hasard, le résolvent (Decimal pour les virgules), écrivent la correction étape par étape |
+| `catalogue.py` | réunit les générateurs de toutes les classes et tire une série |
+| `stockage.py` | garde la classe choisie, les réponses et le niveau de chaque chapitre (SQLite) |
+| `tuteur.py` | réexplique *autrement*, en recevant la leçon, la bonne réponse calculée et la réponse de l'enfant ; il connaît sa classe et son âge |
+| `lecons.py`, `lecons_cm2.py`, `lecons_6e.py` | les leçons, classe par classe, affichées sur la page et données au tuteur comme référence (à la manière d'un RAG) |
 
-## Chapitres
+## Classes et chapitres
 
-Nombres : les grands nombres, les fractions, les nombres décimaux.
-Calcul : addition et soustraction posées, tables et calcul mental,
-multiplication posée, division. Grandeurs et mesures : les mesures, le
-périmètre. Problèmes : résoudre des problèmes en une ou deux étapes.
+**CM1** (10 chapitres) — Nombres : les grands nombres, les fractions, les
+nombres décimaux. Calcul : addition et soustraction posées, tables et calcul
+mental, multiplication posée, division. Grandeurs et mesures : les mesures,
+le périmètre. Problèmes en une ou deux étapes.
+
+**CM2** (9 chapitres) — Nombres jusqu'au milliard, fractions et fractions
+décimales, décimaux jusqu'aux millièmes. Multiplier (décimal × entier,
+× 10/100/1 000, multiplication posée), division (diviseur à deux chiffres,
+quotient décimal). Proportionnalité et pourcentages simples. Mesures et
+durées, périmètres et aires. Problèmes à étapes avec des décimaux.
+
+**6e** (8 chapitres) — Nombres décimaux (fractions décimales, encadrer,
+ranger, × 0,1), calculer avec des décimaux (produit, division, ordre des
+calculs), multiples et diviseurs (critères, division euclidienne), fractions
+(quotient, fractions égales, simplifier, additionner), proportionnalité
+(pourcentages, échelles), cercle, aires et volumes, angles, problèmes.
+
+**Changer de classe** : le parent choisit la classe dans « Suivi » (rien à
+redéployer). `ECOLE_CLASSE` ne sert qu'au tout premier démarrage. Les
+chapitres des classes d'avant restent ouverts, repliés sous « Réviser » sur
+l'accueil, avec leurs niveaux et leurs étoiles.
 
 Chaque chapitre a 3 niveaux. Il monte d'un niveau après au moins 6 exercices
 réussis à 85 % du premier coup, et redescend après au moins 4 exercices
@@ -73,10 +91,17 @@ Pour essayer la page avec l'API, lancer le service puis servir `www/` par
 le même serveur (la page appelle `/api/ecole/` sur sa propre adresse) ;
 en ligne, c'est Caddy qui assemble les deux.
 
+## Ajouter une classe plus tard (5e…)
+
+1. `lecons_5e.py` (même format) et `exercices_5e.py` (un `GENERATEURS` dont
+   les identifiants commencent par `5e-`, pour rester uniques).
+2. Une ligne dans `CLASSES` (`lecons.py`) et une dans `catalogue.py`.
+3. Les tests vérifient d'eux-mêmes chaque générateur à chaque niveau.
+
 ## Ajouter une matière plus tard
 
-1. Une leçon dans `lecons.py` (même format : `retenir` et `exemple`).
-2. Pour les maths : un générateur dans `exercices.py`, ajouté à `GENERATEURS`.
+1. Une leçon dans le fichier de la classe (même format : `retenir` et `exemple`).
+2. Pour les maths : un générateur dans le fichier d'exercices de la classe, ajouté à son `GENERATEURS`.
    Pour le français, les sciences ou l'histoire, où il n'y a pas de calcul à
    garantir, on peut écrire des banques de questions vérifiées à la main
    (QCM), ou laisser le tuteur proposer des questions à partir de la leçon.

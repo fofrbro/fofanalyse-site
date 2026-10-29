@@ -10,6 +10,7 @@ from decimal import Decimal
 import pytest
 from starlette.testclient import TestClient
 
+import catalogue
 import exercices as E
 import lecons
 from app import Config, creer_app
@@ -27,12 +28,12 @@ def valeur_attendue(ex):
     return ex["reponse"] if ex["type"] == "choix" else Decimal(ex["reponse"])
 
 
-@pytest.mark.parametrize("chapitre", list(E.GENERATEURS))
+@pytest.mark.parametrize("chapitre", list(catalogue.GENERATEURS))
 @pytest.mark.parametrize("niveau", [1, 2, 3])
 def test_chaque_generateur_donne_des_exercices_complets(chapitre, niveau):
     rng = random.Random(f"{chapitre}{niveau}")
-    for _ in range(150):
-        ex = E.generer(chapitre, niveau, rng)
+    for _ in range(300):
+        ex = catalogue.generer(chapitre, niveau, rng)
         assert ex["enonce"] and ex["indice"] and ex["explication"] and ex["reponse_texte"]
         assert ex["type"] in ("nombre", "multi", "choix")
         if ex["type"] == "choix":
@@ -45,6 +46,7 @@ def test_chaque_generateur_donne_des_exercices_complets(chapitre, niveau):
             assert E.verifier(ex, ex["reponse"].replace(".", ","))
             assert Decimal(ex["reponse"]) >= 0
         assert "None" not in ex["enonce"] + ex["explication"]
+        assert "E+" not in ex["enonce"] + ex["explication"] + ex["reponse_texte"]
 
 
 def test_les_calculs_poses_sont_justes():
@@ -93,13 +95,15 @@ def test_lecture_des_reponses():
 
 
 def test_series_sans_doublon():
-    s = E.serie("tables", 1, 8, random.Random(1))
+    s = catalogue.serie("tables", 1, 8, random.Random(1))
     assert len(s) == 8 and len({e["enonce"] for e in s}) == 8
 
 
 def test_chaque_chapitre_a_sa_lecon():
-    assert set(E.GENERATEURS) == set(lecons.PAR_ID)
+    assert set(catalogue.GENERATEURS) == set(lecons.PAR_ID)
+    assert len(lecons.PAR_ID) == len(lecons.CHAPITRES)  # identifiants uniques d'une classe à l'autre
     for c in lecons.CHAPITRES:
+        assert c["classe"] in lecons.CLASSES
         assert c["retenir"] and c["exemple"]["etapes"]
         assert c["titre"] in lecons.lecon_en_texte(c["id"])
 
@@ -115,11 +119,11 @@ class FauxTuteur:
     def message_autorise(self, texte):
         return "interdit" not in texte
 
-    def repondre(self, lecon, question, historique):
-        self.appels.append(("repondre", lecon, question, historique))
+    def repondre(self, lecon, question, historique, classe, age):
+        self.appels.append(("repondre", lecon, question, historique, classe))
         return "Voici une explication."
 
-    def reexpliquer(self, lecon, ex, reponse):
+    def reexpliquer(self, lecon, ex, reponse, classe, age):
         self.appels.append(("reexpliquer", ex, reponse))
         return "Essayons autrement."
 
@@ -164,7 +168,7 @@ def test_trop_de_codes_faux(client):
 
 
 def test_parcours_eleve(client):
-    assert se_connecter(client) == {"role": "eleve", "prenom": "Mouaz", "tuteur": True}
+    assert se_connecter(client) == {"role": "eleve", "prenom": "Mouaz", "tuteur": True, "classe": "CM1"}
     prog = client.get("/api/ecole/programme").json()
     assert len(prog["chapitres"]) == 10 and prog["progres"]["tables"]["niveau"] == 1
 
@@ -213,7 +217,7 @@ def test_tuteur_plafond_et_moderation(client):
     r = client.post("/api/ecole/tuteur", json={"chapitre": "fractions", "question": "C'est quoi un quart ?",
                                                "historique": [{"role": "user", "content": "bonjour"}]})
     assert r.json() == {"reponse": "Voici une explication."}
-    _, lecon, question, historique = client.tuteur.appels[-1]
+    _, lecon, question, historique, classe = client.tuteur.appels[-1]
     assert "Les fractions" in lecon and question == "C'est quoi un quart ?"
 
     r = client.post("/api/ecole/tuteur", json={"chapitre": "fractions", "question": "un mot interdit"})
@@ -235,7 +239,7 @@ def test_tuteur_plafond_et_moderation(client):
 def test_tuteur_en_panne_ou_absent(client, tmp_path):
     se_connecter(client)
 
-    def panne(*a):
+    def panne(*a, **k):
         raise TuteurIndisponible("délai dépassé")
     client.tuteur.repondre = panne
     r = client.post("/api/ecole/tuteur", json={"chapitre": "tables", "question": "7 × 8 ?"})
@@ -268,3 +272,55 @@ def test_requetes_non_json_refusees(client):
     r = client.post("/api/ecole/serie", content="chapitre=tables",
                     headers={"content-type": "application/x-www-form-urlencoded"})
     assert r.status_code == 400
+
+
+def test_division_decimale_posee():
+    for n, d in [(47, 4), (9, 4), (978, 8), (113, 5)]:
+        lignes = E.etapes_division_decimale(n, d)
+        assert lignes[-1].startswith(f"Résultat : {n} ÷ {d} = {E.ecrire(Decimal(n) / d)}.")
+    lignes = E.etapes_division_decimale(Decimal("45.6"), 4)
+    assert "J'abaisse le 6" in " ".join(lignes) and lignes[-1].startswith("Résultat : 45,6 ÷ 4 = 11,4.")
+    # Diviseur à deux chiffres : on prend assez de chiffres au départ
+    assert E.etapes_division(1234, 25)[0].startswith("12 est plus petit que 25 : je prends les trois premiers")
+
+
+def test_classe_reglee_par_le_parent(client):
+    se_connecter(client)
+    prog = client.get("/api/ecole/programme").json()
+    assert prog["classe"] == "CM1" and prog["classes"] == ["CM1", "CM2", "6e"]
+    assert client.post("/api/ecole/serie", json={"chapitre": "cm2-decimaux"}).status_code == 400
+    assert client.post("/api/ecole/classe", json={"classe": "CM2"}).status_code == 403
+
+    se_connecter(client, "papa-2026")
+    assert client.post("/api/ecole/classe", json={"classe": "5e"}).status_code == 400
+    assert client.post("/api/ecole/classe", json={"classe": "CM2"}).json() == {"classe": "CM2"}
+
+    se_connecter(client)
+    prog = client.get("/api/ecole/programme").json()
+    classes = [c["classe"] for c in prog["chapitres"]]
+    assert prog["classe"] == "CM2" and set(classes) == {"CM1", "CM2"}
+    assert classes.index("CM2") > classes.index("CM1") or classes[0] == "CM1"
+    assert client.post("/api/ecole/serie", json={"chapitre": "cm2-decimaux"}).status_code == 200
+    # Les chapitres de CM1 restent ouverts pour réviser
+    assert client.post("/api/ecole/serie", json={"chapitre": "fractions"}).status_code == 200
+    # Pas encore la 6e
+    assert client.post("/api/ecole/serie", json={"chapitre": "6e-fractions"}).status_code == 400
+
+    client.post("/api/ecole/tuteur", json={"chapitre": "fractions", "question": "C'est quoi un quart ?"})
+    assert client.tuteur.appels[-1][-1] == "CM2"
+
+    # « Tout effacer » garde la classe choisie
+    se_connecter(client, "papa-2026")
+    client.post("/api/ecole/effacer", json={"confirmation": "EFFACER"})
+    assert client.get("/api/ecole/suivi").json()["classe"] == "CM2"
+
+
+def test_classe_de_depart_et_consignes(tmp_path):
+    with pytest.raises(RuntimeError):
+        Config({**ENV, "ECOLE_CLASSE": "CE2"})
+    env = {**ENV, "ECOLE_DB": str(tmp_path / "e.db"), "ECOLE_CLASSE": "6e"}
+    c = TestClient(creer_app(Config(env), FauxTuteur()), base_url="http://test")
+    assert se_connecter(c)["classe"] == "6e"
+    assert len(c.get("/api/ecole/programme").json()["chapitres"]) == len(lecons.CHAPITRES)
+    from tuteur import consignes
+    assert "élève de 6e (11 ans)" in consignes("Mouaz", "6e", 11)

@@ -1,9 +1,10 @@
 """
 Progression de l'élève, dans un fichier SQLite (volume Docker ecole_data).
 
-Rien d'autre que le travail scolaire : les exercices proposés, les réponses,
-le niveau atteint dans chaque chapitre, le nombre d'appels au tuteur et les
-messages que le filtre de sécurité a bloqués (pour que le parent les voie).
+Rien d'autre que le travail scolaire : la classe choisie par le parent, les
+exercices proposés, les réponses, le niveau atteint dans chaque chapitre, le
+nombre d'appels au tuteur et les messages que le filtre de sécurité a bloqués
+(pour que le parent les voie).
 """
 
 import json
@@ -38,6 +39,11 @@ CREATE TABLE IF NOT EXISTS appels_ia (
     nombre INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS reglages (
+    cle TEXT PRIMARY KEY,
+    valeur TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS questions_tuteur (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chapitre TEXT,
@@ -61,6 +67,17 @@ class Stockage:
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.executescript(SCHEMA)
+
+    # --- Réglages -------------------------------------------------------
+
+    def reglage(self, cle, defaut=None):
+        ligne = self.db.execute("SELECT valeur FROM reglages WHERE cle = ?", (cle,)).fetchone()
+        return ligne["valeur"] if ligne else defaut
+
+    def regler(self, cle, valeur):
+        with self.verrou, self.db:
+            self.db.execute("INSERT INTO reglages (cle, valeur) VALUES (?, ?) "
+                            "ON CONFLICT (cle) DO UPDATE SET valeur = excluded.valeur", (cle, valeur))
 
     # --- Exercices ------------------------------------------------------
 
@@ -185,6 +202,7 @@ class Stockage:
                 "appels_ia_aujourdhui": appels["nombre"] if appels else 0}
 
     def tout_effacer(self):
+        """Efface le travail de l'élève ; la classe choisie reste."""
         with self.verrou, self.db:
             for table in ("exercices", "niveaux", "questions_tuteur"):
                 self.db.execute(f"DELETE FROM {table}")

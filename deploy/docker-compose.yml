@@ -1,5 +1,5 @@
 # Pile complète du serveur fofanalyse.com : un seul Caddy (HTTPS automatique)
-# pour le site, le formulaire de contact, l'espace de révision CM1 et la
+# pour le site, le formulaire de contact, l'espace de révision (CM1 → 6e) et la
 # démo de l'agent.
 #
 # Sur le serveur, les deux dépôts sont clonés côte à côte :

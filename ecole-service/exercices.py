@@ -1,5 +1,7 @@
 """
-Générateurs d'exercices de mathématiques, programme de CM1.
+Outils communs des générateurs d'exercices, et les générateurs du CM1.
+Ceux du CM2 et de la 6e sont dans exercices_cm2.py et exercices_6e.py ;
+catalogue.py les réunit par classe.
 
 Le principe : le code calcule, l'IA explique. Chaque exercice est tiré au
 hasard puis résolu ici, en Python : la bonne réponse et l'explication pas à
@@ -20,15 +22,17 @@ Un exercice est un dictionnaire :
 """
 
 import math
-import random
 from decimal import Decimal, InvalidOperation
 
 ESPACE = " "  # espace fine insécable entre les milliers : 36 408
 
 RANGS = ["unités", "dizaines", "centaines", "milliers", "dizaines de mille",
-         "centaines de mille", "millions"]
+         "centaines de mille", "millions", "dizaines de millions", "centaines de millions",
+         "milliards"]
 RANGS_SINGULIER = ["unité", "dizaine", "centaine", "millier", "dizaine de mille",
-                   "centaine de mille", "million"]
+                   "centaine de mille", "million", "dizaine de millions", "centaine de millions",
+                   "milliard"]
+RANGS_DECIMAUX = ["dixièmes", "centièmes", "millièmes"]
 
 
 # --- Écriture des nombres ------------------------------------------------
@@ -43,6 +47,26 @@ def ecrire(n) -> str:
         entier = ecrire(int(entier))
         return signe + entier + ("," + decimales if decimales else "")
     return f"{n:,}".replace(",", ESPACE)
+
+
+def ecrire_fixe(d, places: int) -> str:
+    """Decimal("2.5"), 2 → « 2,50 » : garde les zéros, pour aligner les virgules."""
+    if places == 0:
+        return ecrire(int(d))
+    texte = format(Decimal(d).quantize(Decimal(1).scaleb(-places)), "f")
+    entier, _, decimales = texte.partition(".")
+    return f"{ecrire(int(entier))},{decimales}"
+
+
+def nb_decimales(d) -> int:
+    """Nombre de chiffres utiles après la virgule : 2,50 → 1."""
+    texte = format(Decimal(d).normalize(), "f")
+    return len(texte.partition(".")[2])
+
+
+def texte_decimal(d) -> str:
+    """Decimal → la réponse attendue, sans zéro inutile (« 2.5 », « 10 »)."""
+    return format(Decimal(d).normalize(), "f")
 
 
 def lire(texte):
@@ -173,13 +197,18 @@ def etapes_multiplication_2(a: int, b: int) -> list[str]:
     ]
 
 
+PREMIERS = {2: "deux", 3: "trois", 4: "quatre", 5: "cinq"}
+
+
 def etapes_division(n: int, d: int) -> list[str]:
     s = str(n)
     lignes = []
     courant, i = int(s[0]), 1
-    if courant < d and len(s) > 1:
-        courant, i = int(s[:2]), 2
-        lignes.append(f"{s[0]} est plus petit que {d} : je prends les deux premiers chiffres, {courant}.")
+    while courant < d and i < len(s):
+        courant, i = int(s[:i + 1]), i + 1
+    if i > 1:
+        lignes.append(f"{s[:i - 1]} est plus petit que {d} : je prends les {PREMIERS.get(i, i)} "
+                      f"premiers chiffres, {courant}.")
     while True:
         q = courant // d
         reste = courant - q * d
@@ -195,6 +224,38 @@ def etapes_division(n: int, d: int) -> list[str]:
         lignes.append(f"Quotient : {ecrire(q)}, reste : {r}. Vérification : {ecrire(q)} × {d} + {r} = {ecrire(n)} ✓")
     else:
         lignes.append(f"Résultat : {ecrire(q)}. Vérification : {ecrire(q)} × {d} = {ecrire(n)} ✓")
+    return lignes
+
+
+def etapes_division_decimale(dividende, d: int) -> list[str]:
+    """Division posée qui continue après la virgule, jusqu'à un reste nul.
+    Le quotient doit tomber juste avec peu de décimales (le générateur le choisit ainsi)."""
+    dividende = Decimal(dividende)
+    entier, _, decimales = texte_decimal(dividende).partition(".")
+    n = int(entier)
+    if n >= d:
+        lignes = etapes_division(n, d)[:-1]
+    else:
+        lignes = [f"En {n}, combien de fois {d} ? 0 fois : le quotient commence par 0."]
+    reste, a_abaisser = n % d, list(decimales)
+    if reste or a_abaisser:
+        lignes.append("J'écris la virgule au quotient, puis je continue.")
+    for _ in range(8):
+        if not (reste or a_abaisser):
+            break
+        if a_abaisser:
+            chiffre = a_abaisser.pop(0)
+            quoi = f"le {chiffre}"
+        else:
+            chiffre, quoi = "0", "un 0"
+        courant = reste * 10 + int(chiffre)
+        q = courant // d
+        reste = courant - q * d
+        lignes.append(f"J'abaisse {quoi} : {courant}. En {courant}, combien de fois {d} ? "
+                      f"{q} fois ({q} × {d} = {q * d}), il reste {reste}.")
+    resultat = dividende / d
+    lignes.append(f"Résultat : {ecrire(dividende)} ÷ {d} = {ecrire(resultat)}. "
+                  f"Vérification : {ecrire(resultat)} × {d} = {ecrire(dividende)} ✓")
     return lignes
 
 
@@ -226,8 +287,8 @@ def decomposer(rng, niveau):
                     "Quand il y a un 0, écris 0.", champs=champs)
 
 
-def comparer_nombres(rng, niveau):
-    k = 3 + niveau
+def comparer_nombres(rng, niveau, taille=None):
+    k = taille or 3 + niveau
     a = nombre_au_hasard(rng, k, zeros=False)
     da = list(str(a))
     pos = rng.randint(1, k - 1)
@@ -273,8 +334,8 @@ def arrondir(rng, niveau):
                     f"{ecrire(n)} ? Regarde ensuite le chiffre des {sous}.".replace("valeurs", "nombres ronds"))
 
 
-def chiffre_ou_nombre_de(rng, niveau):
-    n = nombre_au_hasard(rng, 3 + niveau, zeros=False)
+def chiffre_ou_nombre_de(rng, niveau, taille=None):
+    n = nombre_au_hasard(rng, taille or 3 + niveau, zeros=False)
     k = len(str(n))
     rang = rng.randint(1, k - 1)
     if niveau == 3 and rng.random() < 0.6:
@@ -557,6 +618,12 @@ def niveau_min(niveau_requis, generateur):
     return generateur
 
 
+def avec_prenom(generateur):
+    """Le générateur reçoit le prénom de l'élève, pour l'écrire dans ses énoncés."""
+    generateur.avec_prenom = True
+    return generateur
+
+
 operation_decimaux = niveau_min(2, operation_decimaux)
 
 
@@ -648,6 +715,7 @@ def perimetre(rng, niveau):
 
 # --- 10. Problèmes -----------------------------------------------------------------
 
+@avec_prenom
 def probleme(rng, niveau, prenom="Mouaz"):
     nom = rng.choice([prenom, prenom, "Léa", "Sami", "Inès", "Hugo"])
     il = "elle" if nom in ("Léa", "Inès") else "il"
@@ -741,7 +809,7 @@ def probleme(rng, niveau, prenom="Mouaz"):
                     f"Fais un dessin : Tom a 1 part, {nom} a {k} parts. Combien de parts en tout ?", unite="cartes")
 
 
-# --- Catalogue ------------------------------------------------------------------
+# --- Catalogue du CM1 (catalogue.py réunit toutes les classes) ---------------------
 
 GENERATEURS = {
     "nombres": [decomposer, comparer_nombres, arrondir, chiffre_ou_nombre_de],
@@ -755,29 +823,3 @@ GENERATEURS = {
     "perimetre": [perimetre],
     "problemes": [probleme],
 }
-
-
-def generer(chapitre: str, niveau: int, rng: random.Random | None = None, prenom: str = "Mouaz") -> dict:
-    rng = rng or random.Random()
-    niveau = max(1, min(3, niveau))
-    choix = [g for g in GENERATEURS[chapitre] if getattr(g, "niveau_min", 1) <= niveau]
-    g = rng.choice(choix)
-    if g is probleme:
-        return probleme(rng, niveau, prenom)
-    return g(rng, niveau)
-
-
-def serie(chapitre: str, niveau: int, nombre: int = 8, rng: random.Random | None = None,
-          prenom: str = "Mouaz") -> list[dict]:
-    """Une série d'exercices sans doublon d'énoncé."""
-    rng = rng or random.Random()
-    vus, resultat = set(), []
-    for _ in range(nombre * 6):
-        ex = generer(chapitre, niveau, rng, prenom)
-        if ex["enonce"] in vus:
-            continue
-        vus.add(ex["enonce"])
-        resultat.append(ex)
-        if len(resultat) == nombre:
-            break
-    return resultat

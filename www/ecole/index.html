@@ -41,12 +41,14 @@
     <!-- Accueil : les chapitres -->
     <section id="vue-accueil" class="vue" hidden>
       <h1 id="bonjour">Bonjour</h1>
+      <p class="classe-actuelle" id="classe-actuelle"></p>
       <div class="conseil" id="conseil" hidden>
         <p class="conseil-titre">À travailler aujourd'hui</p>
         <p class="conseil-texte" id="conseil-texte"></p>
         <a class="bouton" id="conseil-lien" href="#accueil">J'y vais</a>
       </div>
       <div id="domaines"></div>
+      <div id="revisions"></div>
     </section>
 
     <!-- Un chapitre : la leçon et le tuteur -->
@@ -123,6 +125,15 @@
       <a class="retour" href="#accueil">← Les chapitres</a>
       <h1>Suivi</h1>
       <p class="resume" id="suivi-resume"></p>
+
+      <h2>Classe</h2>
+      <p class="aide">Le programme suit la classe choisie ici. Les chapitres des classes d'avant restent ouverts pour réviser.</p>
+      <form id="form-classe" class="ligne">
+        <label class="cache" for="choix-classe">Classe</label>
+        <select id="choix-classe"></select>
+        <button class="bouton secondaire" type="submit">Changer de classe</button>
+      </form>
+      <p class="message" id="message-classe" aria-live="polite"></p>
 
       <h2>Les 14 derniers jours</h2>
       <div class="activite" id="activite"></div>

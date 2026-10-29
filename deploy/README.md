@@ -118,11 +118,13 @@ CONTACT_TO=cheikhou@fofanalyse.com
 # Démo de l'agent (facultatif) : clé d'un projet OpenAI dédié, plafonné
 OPENAI_API_KEY=cle-du-projet-openai-de-la-demo
 
-# Espace de révision CM1 (/ecole/)
+# Espace de révision du CM1 à la 6e (/ecole/)
 ECOLE_CODE_ELEVE=code-de-mouaz
 ECOLE_CODE_PARENT=code-du-parent-different
 ECOLE_SECRET=coller-ici-le-resultat-de-openssl-rand-hex-32
 ECOLE_PRENOM=Mouaz
+# Classe au premier démarrage (CM1, CM2 ou 6e) ; ensuite, le parent la change dans « Suivi »
+ECOLE_CLASSE=CM1
 # Tuteur IA (facultatif) : un AUTRE projet OpenAI que la démo, plafonné
 ECOLE_OPENAI_API_KEY=cle-du-projet-openai-du-tuteur
 ECOLE_OPENAI_MODEL=gpt-4o-mini

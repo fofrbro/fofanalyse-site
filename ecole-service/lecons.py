@@ -1,13 +1,20 @@
 """
-Leçons de mathématiques de CM1 (programme de l'école élémentaire, cycle 3).
+Leçons de mathématiques, classe par classe : CM1 ici, CM2 et 6e dans
+lecons_cm2.py et lecons_6e.py.
 
 Chaque leçon est courte et écrite pour un enfant de 9 ans : ce qu'il faut
 retenir, puis un exemple résolu. Elle sert deux fois : elle s'affiche sur
 la page, et elle est donnée au tuteur IA comme référence, pour qu'il
 explique avec les mêmes mots et la même méthode que la leçon.
+
+Pour une nouvelle classe : un fichier lecons_xxx.py, ses générateurs
+d'exercices, et une ligne dans CLASSES ci-dessous et dans catalogue.py.
 """
 
-CHAPITRES = [
+import lecons_6e
+import lecons_cm2
+
+CHAPITRES_CM1 = [
     {
         "id": "nombres", "titre": "Les grands nombres", "domaine": "Nombres",
         "resume": "Lire, décomposer, comparer et arrondir les nombres jusqu'au million.",
@@ -189,7 +196,25 @@ CHAPITRES = [
     },
 ]
 
+# Les classes dans l'ordre de la scolarité, avec l'âge habituel (pour le tuteur).
+CLASSES = {
+    "CM1": {"age": 9, "chapitres": CHAPITRES_CM1},
+    "CM2": {"age": 10, "chapitres": lecons_cm2.CHAPITRES},
+    "6e": {"age": 11, "chapitres": lecons_6e.CHAPITRES},
+}
+
+for _classe, _infos in CLASSES.items():
+    for _chapitre in _infos["chapitres"]:
+        _chapitre["classe"] = _classe
+
+CHAPITRES = [c for infos in CLASSES.values() for c in infos["chapitres"]]
 PAR_ID = {c["id"]: c for c in CHAPITRES}
+
+
+def chapitres_jusqua(classe: str) -> list[dict]:
+    """Les chapitres de la classe, précédés de ceux des classes d'avant (pour réviser)."""
+    noms = list(CLASSES)
+    return [c for nom in noms[:noms.index(classe) + 1] for c in CLASSES[nom]["chapitres"]]
 
 
 def lecon_en_texte(chapitre_id: str) -> str:

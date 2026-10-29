@@ -29,8 +29,8 @@ REPONSE_BLOQUEE = ("Je ne peux pas t'aider avec ce message. Si quelque chose te 
                    "parles-en à Papa ou à un adulte de confiance. On reprend les maths ?")
 
 
-def consignes(prenom: str) -> str:
-    return f"""Tu es le tuteur de mathématiques de {prenom}, un élève de CM1 (9 ans), en France.
+def consignes(prenom: str, classe: str = "CM1", age: int = 9) -> str:
+    return f"""Tu es le tuteur de mathématiques de {prenom}, un élève de {classe} ({age} ans), en France.
 Tu l'aides à comprendre ses leçons et ses exercices, sur le site que son papa a créé pour lui.
 
 Ta façon de parler :
@@ -41,14 +41,15 @@ Ta façon de parler :
 - Tu peux écrire les calculs ligne par ligne. Pas de tableau, pas de LaTeX, pas de lien.
 
 Ta méthode :
-- Tu suis la méthode de la leçon fournie (c'est celle de l'école française) et ses mots.
+- Tu suis la méthode de la leçon fournie (c'est celle de l'école française) et ses mots. La leçon peut
+  venir d'une classe d'avant : {prenom} révise. Reste alors au niveau de cette leçon.
 - Pour un exercice, tu guides avec une question ou un indice avant de tout donner, sauf si on te demande
   d'expliquer une correction : alors tu montres les étapes.
 - Quand une bonne réponse t'est fournie, elle est juste : appuie-toi dessus, ne refais pas un autre calcul.
 - Si {prenom} demande juste la réponse d'un devoir, aide-le à la trouver lui-même au lieu de la donner.
 
 Tes limites :
-- Tu parles uniquement de l'école (maths surtout, et les autres matières de CM1 si on te le demande).
+- Tu parles uniquement de l'école (maths surtout, et les autres matières de {classe} si on te le demande).
   Pour toute autre demande, réponds gentiment que tu es là pour les leçons, et propose de reprendre.
 - Tu ne demandes jamais d'information personnelle (nom de famille, adresse, école, photos, mots de passe).
 - Si {prenom} semble triste, inquiet, en danger, ou parle de quelque chose de grave, tu ne poses pas
@@ -89,10 +90,10 @@ class Tuteur:
         except (TuteurIndisponible, KeyError, IndexError):
             return True
 
-    def _discuter(self, messages, longueur=350) -> str:
+    def _discuter(self, messages, classe, age, longueur=350) -> str:
         r = self._post(URL_CHAT, {
             "model": self.modele,
-            "messages": [{"role": "system", "content": consignes(self.prenom)}] + messages,
+            "messages": [{"role": "system", "content": consignes(self.prenom, classe, age)}] + messages,
             "max_completion_tokens": longueur,
             "temperature": 0.4,
         })
@@ -101,16 +102,16 @@ class Tuteur:
         except (KeyError, IndexError, AttributeError) as e:
             raise TuteurIndisponible("réponse inattendue") from e
 
-    def repondre(self, lecon: str, question: str, historique: list[dict]) -> str:
+    def repondre(self, lecon: str, question: str, historique: list[dict], classe="CM1", age=9) -> str:
         messages = [{"role": "user", "content": f"Voici la leçon de référence (ne la recopie pas) :\n{lecon}"},
                     {"role": "assistant", "content": "D'accord, je m'appuie sur cette leçon."}]
         for m in historique[-MAX_HISTORIQUE:]:
             if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str):
                 messages.append({"role": m["role"], "content": m["content"][:800]})
         messages.append({"role": "user", "content": question[:MAX_QUESTION]})
-        return self._discuter(messages)
+        return self._discuter(messages, classe, age)
 
-    def reexpliquer(self, lecon: str, ex: dict, reponse_eleve) -> str:
+    def reexpliquer(self, lecon: str, ex: dict, reponse_eleve, classe="CM1", age=9) -> str:
         if isinstance(reponse_eleve, list):
             reponse_eleve = " ; ".join(f"{r} {c['label']}" for r, c in zip(reponse_eleve, ex["champs"] or []))
         contexte = (
@@ -123,7 +124,7 @@ class Tuteur:
             f"devine d'où vient probablement son erreur (sans le gronder), puis montre la méthode "
             f"avec une image ou un exemple concret. Termine par une petite question pour vérifier qu'il a compris."
         )
-        return self._discuter([{"role": "user", "content": contexte}], longueur=450)
+        return self._discuter([{"role": "user", "content": contexte}], classe, age, longueur=450)
 
 
 def depuis_environnement() -> Tuteur:

@@ -1,5 +1,7 @@
 """
-Service « École » de fofanalyse.com : l'espace de révision de CM1.
+Service « École » de fofanalyse.com : l'espace de révision de maths, du CM1
+à la 6e. Le parent choisit la classe dans le suivi ; les chapitres des
+classes d'avant restent ouverts pour réviser.
 
 Servi par Caddy sous https://fofanalyse.com/api/ecole/ ; la page est dans
 www/ecole/. Accès privé par code : un code élève, un code parent (le parent
@@ -12,6 +14,8 @@ Configuration (deploy/.env) :
   ECOLE_OPENAI_MODEL                    modèle (défaut : gpt-4o-mini)
   ECOLE_IA_PAR_JOUR                     plafond d'appels au tuteur par jour (défaut : 60)
   ECOLE_PRENOM                          prénom de l'élève (défaut : Mouaz)
+  ECOLE_CLASSE                          classe au premier démarrage : CM1, CM2 ou 6e (défaut : CM1) ;
+                                        ensuite, le parent la change dans le suivi
   ECOLE_DB                              fichier SQLite (défaut : /data/ecole.db)
   ECOLE_SECURE_COOKIE                   true en ligne (HTTPS), false en local
 """
@@ -31,6 +35,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
+import catalogue
 import exercices as E
 import lecons
 from stockage import Stockage
@@ -47,6 +52,7 @@ class Config:
         self.code_parent = env.get("ECOLE_CODE_PARENT", "")
         self.secret = env.get("ECOLE_SECRET", "")
         self.prenom = env.get("ECOLE_PRENOM", "Mouaz")
+        self.classe = env.get("ECOLE_CLASSE", "CM1")
         self.ia_par_jour = int(env.get("ECOLE_IA_PAR_JOUR", "60"))
         self.db = env.get("ECOLE_DB", "/data/ecole.db")
         self.cookie_securise = env.get("ECOLE_SECURE_COOKIE", "true").lower() != "false"
@@ -55,6 +61,8 @@ class Config:
                                "(4 caractères min.) doivent être définis dans deploy/.env")
         if self.code_eleve == self.code_parent:
             raise RuntimeError("ECOLE_CODE_ELEVE et ECOLE_CODE_PARENT doivent être différents")
+        if self.classe not in lecons.CLASSES:
+            raise RuntimeError(f"ECOLE_CLASSE doit valoir {', '.join(lecons.CLASSES)}")
 
 
 def erreur(message, statut=400):
@@ -97,6 +105,20 @@ def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
 
     def session(request: Request):
         return verifier_session(config.secret, request.cookies.get(COOKIE))
+
+    def classe() -> str:
+        choisie = stock.reglage("classe", config.classe)
+        return choisie if choisie in lecons.CLASSES else config.classe
+
+    def chapitres_ouverts() -> dict:
+        """Les chapitres de la classe et des classes d'avant, par identifiant."""
+        return {c["id"]: c for c in lecons.chapitres_jusqua(classe())}
+
+    def profil(role) -> dict:
+        return {"role": role, "prenom": config.prenom, "tuteur": tuteur.actif, "classe": classe()}
+
+    def pour_tuteur() -> dict:
+        return {"classe": classe(), "age": lecons.CLASSES[classe()]["age"]}
 
     async def corps_json(request: Request) -> dict | None:
         if "application/json" not in request.headers.get("content-type", ""):
@@ -141,7 +163,7 @@ def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
         else:
             file.append(time.time())
             return erreur("Ce code n'est pas le bon.", 401)
-        r = JSONResponse({"role": role, "prenom": config.prenom, "tuteur": tuteur.actif})
+        r = JSONResponse(profil(role))
         r.set_cookie(COOKIE, signer(config.secret, {"role": role, "exp": int(time.time()) + DUREE_SESSION}),
                      max_age=DUREE_SESSION, httponly=True, secure=config.cookie_securise,
                      samesite="strict", path="/api/ecole")
@@ -154,24 +176,25 @@ def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
 
     @protege()
     async def moi(request: Request):
-        return JSONResponse({"role": request.state.role, "prenom": config.prenom, "tuteur": tuteur.actif})
+        return JSONResponse(profil(request.state.role))
 
     # --- Leçons et exercices ------------------------------------------------
 
     @protege()
     async def programme(request: Request):
-        ids = [c["id"] for c in lecons.CHAPITRES]
-        return JSONResponse({"chapitres": lecons.CHAPITRES, "progres": stock.progres_eleve(ids)})
+        chapitres = lecons.chapitres_jusqua(classe())
+        return JSONResponse({"classe": classe(), "classes": list(lecons.CLASSES), "chapitres": chapitres,
+                             "progres": stock.progres_eleve([c["id"] for c in chapitres])})
 
     @protege()
     async def serie(request: Request):
         donnees = await corps_json(request) or {}
         chapitre = donnees.get("chapitre")
-        if chapitre not in lecons.PAR_ID:
+        if chapitre not in chapitres_ouverts():
             return erreur("Chapitre inconnu.")
         niveau = stock.niveau(chapitre)
         liste = []
-        for ex in E.serie(chapitre, niveau, 8, prenom=config.prenom):
+        for ex in catalogue.serie(chapitre, niveau, 8, prenom=config.prenom):
             id_ = secrets.token_urlsafe(12)
             stock.enregistrer_exercice(id_, chapitre, niveau, ex)
             liste.append({"id": id_, **{k: ex[k] for k in CHAMPS_PUBLICS}})
@@ -204,13 +227,13 @@ def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
 
     # --- Tuteur IA -----------------------------------------------------------
 
-    async def appeler_tuteur(fonction, *args):
+    async def appeler_tuteur(fonction, *args, **options):
         if not tuteur.actif:
             return erreur("Le tuteur n'est pas encore branché.", 503)
         if not stock.compter_appel_ia(config.ia_par_jour):
             return erreur("Le tuteur se repose pour aujourd'hui. Reviens demain !", 429)
         try:
-            texte = await run_in_threadpool(fonction, *args)
+            texte = await run_in_threadpool(fonction, *args, **options)
         except TuteurIndisponible:
             return erreur("Le tuteur ne répond pas. Réessaie dans un moment.", 502)
         return JSONResponse({"reponse": texte})
@@ -221,7 +244,7 @@ def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
         chapitre = donnees.get("chapitre")
         question = str(donnees.get("question", "")).strip()
         historique = donnees.get("historique") if isinstance(donnees.get("historique"), list) else []
-        if chapitre not in lecons.PAR_ID or not question:
+        if chapitre not in chapitres_ouverts() or not question:
             return erreur("Écris ta question.")
         if len(question) > 400:
             return erreur("Ta question est trop longue : 400 caractères au maximum.")
@@ -229,7 +252,8 @@ def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
             stock.noter_question(chapitre, question, bloquee=True)
             return JSONResponse({"reponse": REPONSE_BLOQUEE})
         stock.noter_question(chapitre, question)
-        return await appeler_tuteur(tuteur.repondre, lecons.lecon_en_texte(chapitre), question, historique)
+        return await appeler_tuteur(tuteur.repondre, lecons.lecon_en_texte(chapitre), question, historique,
+                                    **pour_tuteur())
 
     @protege()
     async def autrement(request: Request):
@@ -239,14 +263,24 @@ def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
             return erreur("Termine d'abord l'exercice.", 409)
         reponse_eleve = json.loads(ligne["derniere_reponse"] or '""')
         return await appeler_tuteur(tuteur.reexpliquer, lecons.lecon_en_texte(ligne["chapitre"]),
-                                    ligne["donnees"], reponse_eleve)
+                                    ligne["donnees"], reponse_eleve, **pour_tuteur())
 
     # --- Parent ------------------------------------------------------------------
 
     @protege("parent")
     async def suivi(request: Request):
-        ids = [c["id"] for c in lecons.CHAPITRES]
-        return JSONResponse({**stock.suivi_parent(ids), "plafond_ia": config.ia_par_jour, "tuteur": tuteur.actif})
+        ids = [c["id"] for c in lecons.chapitres_jusqua(classe())]
+        return JSONResponse({**stock.suivi_parent(ids), "plafond_ia": config.ia_par_jour, "tuteur": tuteur.actif,
+                             "classe": classe(), "classes": list(lecons.CLASSES)})
+
+    @protege("parent")
+    async def changer_classe(request: Request):
+        donnees = await corps_json(request) or {}
+        nouvelle = donnees.get("classe")
+        if nouvelle not in lecons.CLASSES:
+            return erreur("Classe inconnue.")
+        stock.regler("classe", nouvelle)
+        return JSONResponse({"classe": nouvelle})
 
     @protege("parent")
     async def effacer(request: Request):
@@ -271,6 +305,7 @@ def creer_app(config: Config | None = None, tuteur=None) -> Starlette:
         Route(f"{p}/tuteur", poser_question, methods=["POST"]),
         Route(f"{p}/autrement", autrement, methods=["POST"]),
         Route(f"{p}/suivi", suivi),
+        Route(f"{p}/classe", changer_classe, methods=["POST"]),
         Route(f"{p}/effacer", effacer, methods=["POST"]),
     ])
 

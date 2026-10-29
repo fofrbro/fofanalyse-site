@@ -1,4 +1,4 @@
-// Mon cahier de maths : l'espace de révision de CM1.
+// Mon cahier de maths : l'espace de révision, du CM1 à la 6e.
 // Le serveur (ecole-service) tire les exercices, vérifie les réponses et
 // garde la progression ; le tuteur IA explique. Ici, seulement l'affichage.
 // Script externe, sans style en ligne : compatible avec la CSP du site.
@@ -9,7 +9,8 @@ const $ = (id) => document.getElementById(id);
 
 const etat = {
   role: null, prenom: "", tuteur: false,
-  chapitres: [], progres: {},
+  classe: "", classes: [],   // classe choisie par le parent, et toutes les classes
+  chapitres: [], progres: {}, // chapitres de la classe et des classes d'avant
   chapitre: null,            // chapitre ouvert
   fil: [],                   // conversation avec le tuteur (chapitre ouvert)
   serie: [], position: 0, justes: 0, exercice: null,
@@ -83,7 +84,7 @@ $("form-connexion").addEventListener("submit", async (e) => {
   message.textContent = "";
   try {
     const r = await api("/connexion", { code: $("code").value });
-    Object.assign(etat, { role: r.role, prenom: r.prenom, tuteur: r.tuteur });
+    Object.assign(etat, { role: r.role, prenom: r.prenom, tuteur: r.tuteur, classe: r.classe });
     $("code").value = "";
     await chargerProgramme();
     router();
@@ -103,15 +104,18 @@ $("sortir").addEventListener("click", async () => {
 
 async function chargerProgramme() {
   const r = await api("/programme");
-  etat.chapitres = r.chapitres;
-  etat.progres = r.progres;
+  Object.assign(etat, { chapitres: r.chapitres, progres: r.progres, classe: r.classe, classes: r.classes });
   etoilesTotal();
 }
 
+function titreChapitre(c) {
+  return c.classe === etat.classe ? c.titre : `${c.titre} (${c.classe})`;
+}
+
 function chapitreConseille() {
-  // Le moins travaillé d'abord ; à égalité, celui où il réussit le moins.
+  // Dans la classe en cours : le moins travaillé d'abord ; à égalité, celui où il réussit le moins.
   let meilleur = null, note = Infinity;
-  for (const c of etat.chapitres) {
+  for (const c of etat.chapitres.filter((x) => x.classe === etat.classe)) {
     const p = etat.progres[c.id];
     const taux = p.faits ? p.etoiles / p.faits : 0;
     const score = (p.faits >= 8 ? 1 : 0) * 10 + taux + p.niveau;
@@ -122,6 +126,7 @@ function chapitreConseille() {
 
 function afficherAccueil() {
   $("bonjour").textContent = `Bonjour ${etat.prenom} !`;
+  $("classe-actuelle").textContent = `Programme de ${etat.classe}`;
   const conseil = chapitreConseille();
   if (conseil) {
     const p = etat.progres[conseil.id];
@@ -131,24 +136,40 @@ function afficherAccueil() {
     $("conseil-lien").href = `#${conseil.id}`;
     $("conseil").hidden = false;
   }
+  const actuels = etat.chapitres.filter((c) => c.classe === etat.classe);
   const zone = $("domaines");
   zone.replaceChildren();
-  const domaines = [...new Set(etat.chapitres.map((c) => c.domaine))];
-  for (const d of domaines) {
-    zone.append(el("h2", null, d));
-    const grille = el("div", "chapitres");
-    for (const c of etat.chapitres.filter((x) => x.domaine === d)) {
-      const p = etat.progres[c.id];
-      const a = el("a", "chapitre");
-      a.href = `#${c.id}`;
-      const bas = el("span", "chapitre-bas");
-      bas.append(pointsNiveau(p.niveau), el("span", "etoiles", `★ ${p.etoiles}`));
-      a.append(el("span", "chapitre-titre", c.titre), el("span", "chapitre-resume", c.resume), bas);
-      grille.append(a);
+  for (const d of [...new Set(actuels.map((c) => c.domaine))]) {
+    zone.append(el("h2", null, d), grilleChapitres(actuels.filter((x) => x.domaine === d)));
+  }
+
+  // Les classes d'avant, repliées : pour réviser.
+  const avant = etat.classes.slice(0, etat.classes.indexOf(etat.classe));
+  const revisions = $("revisions");
+  revisions.replaceChildren();
+  if (avant.length) {
+    const bloc = el("details", "revisions");
+    bloc.append(el("summary", null, `Réviser ${avant.length > 1 ? "les années d'avant" : `le ${avant[0]}`}`));
+    for (const classe of avant.reverse()) {
+      bloc.append(el("h3", null, classe), grilleChapitres(etat.chapitres.filter((c) => c.classe === classe)));
     }
-    zone.append(grille);
+    revisions.append(bloc);
   }
   afficher("accueil");
+}
+
+function grilleChapitres(chapitres) {
+  const grille = el("div", "chapitres");
+  for (const c of chapitres) {
+    const p = etat.progres[c.id];
+    const a = el("a", "chapitre");
+    a.href = `#${c.id}`;
+    const bas = el("span", "chapitre-bas");
+    bas.append(pointsNiveau(p.niveau), el("span", "etoiles", `★ ${p.etoiles}`));
+    a.append(el("span", "chapitre-titre", c.titre), el("span", "chapitre-resume", c.resume), bas);
+    grille.append(a);
+  }
+  return grille;
 }
 
 // --- Chapitre : leçon et tuteur -------------------------------------------
@@ -157,7 +178,7 @@ function afficherChapitre(c) {
   if (etat.chapitre?.id !== c.id) etat.fil = [];
   etat.chapitre = c;
   const p = etat.progres[c.id];
-  $("chap-domaine").textContent = c.domaine;
+  $("chap-domaine").textContent = c.classe === etat.classe ? c.domaine : `Révision ${c.classe} · ${c.domaine}`;
   $("chap-titre").textContent = c.titre;
   $("chap-resume").textContent = c.resume;
   $("chap-niveau").textContent = `Niveau ${p.niveau} sur 3 · ${p.faits} exercice${p.faits > 1 ? "s" : ""} fait${p.faits > 1 ? "s" : ""}`;
@@ -397,7 +418,17 @@ function pastille(p) {
 
 async function afficherSuivi() {
   const s = await api("/suivi");
-  const titres = Object.fromEntries(etat.chapitres.map((c) => [c.id, c.titre]));
+  const titres = Object.fromEntries(etat.chapitres.map((c) => [c.id, titreChapitre(c)]));
+  const classeDe = Object.fromEntries(etat.chapitres.map((c) => [c.id, c.classe]));
+  // La classe en cours, plus les chapitres d'avant qui ont été révisés.
+  const lignes = s.chapitres.filter((c) => classeDe[c.chapitre] === s.classe || c.faits > 0);
+
+  $("choix-classe").replaceChildren(...s.classes.map((nom) => {
+    const option = el("option", null, nom);
+    option.value = nom;
+    option.selected = nom === s.classe;
+    return option;
+  }));
   const total = s.chapitres.reduce((a, c) => a + c.faits, 0);
   const semaine = s.chapitres.reduce((a, c) => a + c.faits_7j, 0);
   const faibles = s.chapitres.filter((c) => c.faits >= 4 && pourcent(c.reussis, c.faits) < 50).map((c) => titres[c.chapitre]);
@@ -419,7 +450,7 @@ async function afficherSuivi() {
     return bloc;
   }));
 
-  $("suivi-chapitres").replaceChildren(...s.chapitres.map((c) => {
+  $("suivi-chapitres").replaceChildren(...lignes.map((c) => {
     const tr = el("tr");
     const rates = el("ul", "rates");
     rates.append(...c.derniers_rates.map((r) => el("li", null, r)));
@@ -445,6 +476,21 @@ async function afficherSuivi() {
   if (!s.questions.length) liste.append(el("li", null, "Aucune question pour l'instant."));
   afficher("suivi");
 }
+
+$("form-classe").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const message = $("message-classe");
+  try {
+    const r = await api("/classe", { classe: $("choix-classe").value });
+    await chargerProgramme();
+    await afficherSuivi();
+    message.className = "message ok";
+    message.textContent = `C'est fait : ${etat.prenom} suit maintenant le programme de ${r.classe}.`;
+  } catch (err) {
+    message.className = "message";
+    message.textContent = err.message;
+  }
+});
 
 let confirmer = false;
 $("effacer").addEventListener("click", async () => {
@@ -489,7 +535,7 @@ window.addEventListener("hashchange", router);
 (async function demarrer() {
   try {
     const moi = await api("/moi");
-    Object.assign(etat, { role: moi.role, prenom: moi.prenom, tuteur: moi.tuteur });
+    Object.assign(etat, { role: moi.role, prenom: moi.prenom, tuteur: moi.tuteur, classe: moi.classe });
     await chargerProgramme();
   } catch {
     etat.role = null;
