@@ -32,6 +32,7 @@ import os
 import secrets
 import time
 from collections import defaultdict, deque
+from pathlib import Path
 
 from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
@@ -49,6 +50,8 @@ from tuteur import DERNIERE_ERREUR, REPONSE_BLOQUEE, TuteurIndisponible, depuis_
 
 COOKIE = "ecole_session"
 DUREE_SESSION = 30 * 86400
+MAX_PHOTO = 2_500_000  # la page réduit la photo avant l'envoi (environ 300 Ko)
+SIGNATURES_IMAGES = {b"\xff\xd8\xff": "image/jpeg", b"\x89PNG": "image/png", b"RIFF": "image/webp"}
 CHAMPS_PUBLICS = ("type", "enonce", "grand", "unite", "champs", "options", "indice", "arabe")
 
 
@@ -367,6 +370,82 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None, coran=None) 
         return FileResponse(chemin, media_type="audio/mpeg",
                             headers={"Cache-Control": "private, max-age=2592000, immutable"})
 
+    # --- Devoirs en photo -------------------------------------------------------
+    # L'enfant photographie un énoncé : l'IA lui explique la méthode sans la réponse ;
+    # la solution complète est réservée au parent, qui peut la débloquer pour l'enfant.
+
+    dossier_devoirs = Path(config.db).parent / "devoirs"
+
+    def vue_devoir(d: dict, role: str) -> dict:
+        visible = role == "parent" or bool(d["solution_visible"])
+        return {"id": d["id"], "cree_le": d["cree_le"], "matiere": d["matiere"], "enonce": d["enonce"],
+                "explication": d["explication"], "solution_visible": bool(d["solution_visible"]),
+                "solution": d["solution"] if visible else None}
+
+    @protege()
+    async def envoyer_devoir(request: Request):
+        photo = await request.body()
+        type_image = next((t for sig, t in SIGNATURES_IMAGES.items() if photo.startswith(sig)), None)
+        if not type_image or (type_image == "image/webp" and photo[8:12] != b"WEBP"):
+            return erreur("Envoie une photo (JPEG, PNG ou WebP).")
+        if len(photo) > MAX_PHOTO:
+            return erreur("La photo est trop lourde.")
+        if not tuteur.actif:
+            return erreur("L'aide aux devoirs a besoin de la clé OpenAI du tuteur.", 503)
+        image = f"data:{type_image};base64,{base64.b64encode(photo).decode()}"
+        if not await run_in_threadpool(tuteur.message_autorise, "", image):
+            return erreur("Je ne peux pas regarder cette photo. Photographie seulement ton exercice.", 422)
+        if not stock.compter_appel_ia(config.ia_par_jour):
+            return erreur("Le tuteur se repose pour aujourd'hui. Reviens demain !", 429)
+        try:
+            analyse = await run_in_threadpool(tuteur.analyser_devoir, image, classe(), pour_tuteur()["age"])
+        except TuteurIndisponible:
+            return erreur("Le tuteur ne répond pas. Réessaie dans un moment.", 502)
+        if not analyse["lisible"] or not analyse["explication"]:
+            return erreur("Je n'arrive pas à lire l'exercice. Reprends la photo bien à plat, avec de la lumière, "
+                          "et seulement l'exercice dans le cadre.", 422)
+        id_ = secrets.token_hex(8)
+        dossier_devoirs.mkdir(parents=True, exist_ok=True)
+        (dossier_devoirs / f"{id_}.img").write_bytes(photo)
+        stock.ajouter_devoir(id_, analyse)
+        return JSONResponse(vue_devoir(stock.devoir(id_), request.state.role))
+
+    @protege()
+    async def liste_devoirs(request: Request):
+        return JSONResponse({"devoirs": [vue_devoir(d, request.state.role) for d in stock.devoirs()]})
+
+    def id_devoir(request: Request) -> str | None:
+        id_ = request.path_params["id"]
+        return id_ if re.fullmatch(r"[0-9a-f]{16}", id_) and stock.devoir(id_) else None
+
+    @protege()
+    async def photo_devoir(request: Request):
+        id_ = id_devoir(request)
+        chemin = dossier_devoirs / f"{id_}.img"
+        if not id_ or not chemin.exists():
+            return erreur("Photo introuvable.", 404)
+        contenu = chemin.read_bytes()
+        type_image = next((t for sig, t in SIGNATURES_IMAGES.items() if contenu.startswith(sig)), "image/jpeg")
+        return FileResponse(chemin, media_type=type_image, headers={"Cache-Control": "private, max-age=86400"})
+
+    @protege("parent")
+    async def solution_devoir(request: Request):
+        id_ = id_devoir(request)
+        donnees = await corps_json(request) or {}
+        if not id_ or not isinstance(donnees.get("visible"), bool):
+            return erreur("Devoir inconnu.", 404)
+        stock.montrer_solution(id_, donnees["visible"])
+        return JSONResponse(vue_devoir(stock.devoir(id_), "parent"))
+
+    @protege("parent")
+    async def effacer_devoir(request: Request):
+        id_ = id_devoir(request)
+        if not id_:
+            return erreur("Devoir inconnu.", 404)
+        stock.effacer_devoir(id_)
+        (dossier_devoirs / f"{id_}.img").unlink(missing_ok=True)
+        return JSONResponse({"ok": True})
+
     # --- Coran ------------------------------------------------------------------
     # Le texte et les récitations viennent de sources de référence (voir coran.py) ;
     # rien n'est généré, et le tuteur IA n'intervient pas.
@@ -482,6 +561,11 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None, coran=None) 
         Route(f"{p}/explication", expliquer, methods=["POST"]),
         Route(f"{p}/ecoute", ecouter, methods=["POST"]),
         Route(f"{p}/reglage-voix", changer_voix, methods=["POST"]),
+        Route(f"{p}/devoirs", liste_devoirs),
+        Route(f"{p}/devoirs", envoyer_devoir, methods=["POST"]),
+        Route(f"{p}/devoirs/{{id}}/photo", photo_devoir),
+        Route(f"{p}/devoirs/{{id}}/solution", solution_devoir, methods=["POST"]),
+        Route(f"{p}/devoirs/{{id}}/effacer", effacer_devoir, methods=["POST"]),
         Route(f"{p}/coran", coran_sommaire),
         Route(f"{p}/coran/{{numero:int}}", coran_sourate),
         Route(f"{p}/coran/{{numero:int}}/progres", coran_progresser, methods=["POST"]),

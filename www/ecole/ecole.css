@@ -203,6 +203,18 @@ select {
 .enonce-ligne { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
 .bulle .ecouter { display: block; margin-top: 6px; }
 
+/* Devoirs en photo */
+.devoirs { display: grid; gap: 14px; margin-top: 12px; }
+.devoir { background: var(--carte); border: 1.5px solid var(--bord); border-radius: var(--rayon); padding: 14px 16px; display: grid; gap: 10px; }
+.devoir-entete { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; color: var(--doux); font-size: .9rem; }
+.devoir-photo { max-width: 100%; max-height: 260px; object-fit: contain; border-radius: 10px; border: 1px solid var(--bord); justify-self: start; }
+.devoir h3 { margin: 4px 0 0; font-family: var(--titre); font-size: 1.05rem; color: var(--encre); }
+.devoir p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.devoir .explication { background: var(--etoile-fond); border-radius: 10px; padding: 10px 12px; }
+.devoir .solution { background: var(--ok-fond); border: 1.5px dashed var(--ok); border-radius: 10px; padding: 10px 12px; }
+.devoir .verrou { color: var(--doux); font-style: italic; }
+label.bouton { cursor: pointer; }
+
 /* Coran */
 .sourate-arabe { margin: -6px 0 6px; font-family: "Arabe", system-ui, sans-serif; font-size: 1.8rem; color: var(--doux); }
 .reglages-coran { margin-bottom: 10px; }

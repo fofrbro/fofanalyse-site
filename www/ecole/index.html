@@ -128,6 +128,21 @@
       </div>
     </section>
 
+    <!-- Devoirs en photo -->
+    <section id="vue-devoirs" class="vue" hidden>
+      <a class="retour" href="#accueil">← Les chapitres</a>
+      <h1>Mon devoir en photo</h1>
+      <p class="resume" id="devoirs-intro">Photographie l'énoncé de ton exercice : ta maîtresse t'explique comment t'y prendre.
+        La solution, elle, est réservée à ton parent.</p>
+      <div class="ligne">
+        <label class="bouton gros" for="photo-devoir">📷 Prendre une photo</label>
+        <input class="cache" type="file" id="photo-devoir" accept="image/*" capture="environment">
+      </div>
+      <p class="aide">Pose la feuille bien à plat, avec de la lumière, et cadre seulement l'exercice.</p>
+      <p class="message" id="devoir-message" aria-live="polite"></p>
+      <div class="devoirs" id="liste-devoirs"></div>
+    </section>
+
     <!-- Coran : la liste des sourates -->
     <section id="vue-coran" class="vue" hidden>
       <a class="retour" href="#accueil">← Les chapitres</a>

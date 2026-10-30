@@ -120,12 +120,19 @@ class FauxTuteur:
     def __init__(self):
         self.appels = []
 
-    def message_autorise(self, texte):
+    def message_autorise(self, texte="", image=None):
         return "interdit" not in texte
 
     def repondre(self, lecon, question, historique, classe, age, matiere):
         self.appels.append(("repondre", lecon, question, historique, classe))
         return "Voici une explication."
+
+    def analyser_devoir(self, image, classe, age):
+        self.appels.append(("devoir", image[:30]))
+        if "illisible" in image or image.endswith("AAAA"):
+            return {"lisible": False, "matiere": "", "enonce": "", "explication": "", "solution": ""}
+        return {"lisible": True, "matiere": "Mathématiques", "enonce": "Combien font 7 × 8 ?",
+                "explication": "On te demande un produit. Pense à la table de 7.", "solution": "7 × 8 = 56."}
 
     def expliquer_lecon(self, lecon, classe, age, matiere):
         self.appels.append(("expliquer", lecon))
@@ -684,3 +691,40 @@ def test_argent_pour_toutes_les_classes(client):
     argent = [c for c in prog["chapitres"] if c["matiere"] == "argent"]
     assert len(argent) == 6 and prog["matieres"]["argent"] == "Argent"
     assert client.post("/api/ecole/serie", json={"chapitre": "arg-monnaie"}).status_code == 200
+
+
+# --- Devoirs en photo ------------------------------------------------------------------------------
+
+JPEG = b"\xff\xd8\xff\xe0" + b"photo d'exercice" * 20
+
+
+def test_devoir_en_photo_solution_reservee_au_parent(client, tmp_path):
+    se_connecter(client)
+    assert client.post("/api/ecole/devoirs", content=b"pas une image", headers={"content-type": "image/jpeg"}).status_code == 400
+    d = client.post("/api/ecole/devoirs", content=JPEG, headers={"content-type": "image/jpeg"}).json()
+    assert d["explication"].startswith("On te demande") and d["solution"] is None and d["solution_visible"] is False
+    assert client.get("/api/ecole/devoirs").json()["devoirs"][0]["solution"] is None  # jamais envoyée à l'enfant
+    assert client.get(f"/api/ecole/devoirs/{d['id']}/photo").content == JPEG
+    assert client.post(f"/api/ecole/devoirs/{d['id']}/solution", json={"visible": True}).status_code == 403
+
+    se_connecter(client, "papa-2026")
+    assert client.get("/api/ecole/devoirs").json()["devoirs"][0]["solution"] == "7 × 8 = 56."
+    assert client.post(f"/api/ecole/devoirs/{d['id']}/solution", json={"visible": True}).json()["solution_visible"]
+
+    se_connecter(client)
+    assert client.get("/api/ecole/devoirs").json()["devoirs"][0]["solution"] == "7 × 8 = 56."  # débloquée par le parent
+
+    se_connecter(client, "papa-2026")
+    client.post(f"/api/ecole/devoirs/{d['id']}/solution", json={"visible": False})
+    assert client.post(f"/api/ecole/devoirs/{d['id']}/effacer", json={}).json() == {"ok": True}
+    assert client.get("/api/ecole/devoirs").json()["devoirs"] == []
+    assert client.get(f"/api/ecole/devoirs/{d['id']}/photo").status_code == 404
+    assert client.get("/api/ecole/devoirs/../../ecole.db/photo").status_code == 404
+
+
+def test_devoir_illisible_ou_sans_tuteur(client):
+    se_connecter(client)
+    illisible = b"\xff\xd8\xff" + b"\x00\x00\x00"  # se termine par AAAA en base64
+    assert client.post("/api/ecole/devoirs", content=illisible, headers={"content-type": "image/jpeg"}).status_code == 422
+    client.tuteur.actif = False
+    assert client.post("/api/ecole/devoirs", content=JPEG, headers={"content-type": "image/jpeg"}).status_code == 503

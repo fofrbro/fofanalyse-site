@@ -38,6 +38,14 @@ fofanalyse.com {
 		reverse_proxy ecole:8000
 	}
 
+	# Devoirs en photo : la photo, déjà réduite par la page (quelques centaines de Ko).
+	handle /api/ecole/devoirs {
+		request_body {
+			max_size 3MB
+		}
+		reverse_proxy ecole:8000
+	}
+
 	# API de l'espace de révision : petites requêtes JSON seulement.
 	handle /api/ecole/* {
 		request_body {
