@@ -228,11 +228,21 @@
         <table class="tableau">
           <thead>
             <tr><th scope="col">Chapitre</th><th scope="col">Niveau</th><th scope="col">Exercices</th>
-                <th scope="col">Réussis du 1er coup</th><th scope="col">7 derniers jours</th><th scope="col">Derniers ratés</th></tr>
+                <th scope="col">Réussis du 1er coup</th><th scope="col">7 derniers jours</th><th scope="col">Derniers ratés</th><th scope="col">Questions</th></tr>
           </thead>
           <tbody id="suivi-chapitres"></tbody>
         </table>
       </div>
+
+      <h2>Nouvelles questions</h2>
+      <p class="aide">Le bouton « ➕ Nouvelles » du tableau fait écrire par l'IA de nouvelles questions sur la leçon du chapitre.
+        Une seconde lecture par l'IA élimine les douteuses ; vous gardez ou refusez les autres avant que votre enfant les voie.</p>
+      <label class="case"><input type="checkbox" id="questions-auto"> Valider automatiquement les questions vérifiées (sans passer par vous)</label>
+      <p class="message" id="message-questions" aria-live="polite"></p>
+      <div class="ligne" id="actions-questions" hidden>
+        <button class="bouton" id="tout-garder" type="button">Tout garder</button>
+      </div>
+      <div class="questions-ia" id="questions-a-valider"></div>
 
       <h2>Questions posées au tuteur</h2>
       <p class="aide">Les messages bloqués par le filtre de sécurité sont signalés en rouge.</p>

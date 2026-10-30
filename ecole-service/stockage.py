@@ -68,6 +68,19 @@ CREATE TABLE IF NOT EXISTS devoirs (
     solution_visible INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS questions_ia (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chapitre TEXT NOT NULL,
+    enonce TEXT NOT NULL,
+    bonne TEXT NOT NULL,
+    mauvaises TEXT NOT NULL,
+    explication TEXT NOT NULL,
+    niveau INTEGER NOT NULL,
+    statut TEXT NOT NULL,                -- a_valider, validee, refusee
+    cree_le REAL NOT NULL,
+    UNIQUE (chapitre, enonce)
+);
+
 CREATE TABLE IF NOT EXISTS reglages (
     cle TEXT PRIMARY KEY,
     valeur TEXT NOT NULL
@@ -206,6 +219,32 @@ class Stockage:
         with self.verrou, self.db:
             self.db.execute("INSERT OR REPLACE INTO explications (chapitre, classe, texte, cree_le) VALUES (?, ?, ?, ?)",
                             (chapitre, classe, texte, time.time()))
+
+    # --- Questions écrites par l'IA (validées par le parent) ---------------
+
+    def ajouter_questions_ia(self, chapitre, questions: list[dict], statut: str) -> int:
+        ajoutees = 0
+        with self.verrou, self.db:
+            for q in questions:
+                curseur = self.db.execute(
+                    "INSERT OR IGNORE INTO questions_ia (chapitre, enonce, bonne, mauvaises, explication, niveau, statut, cree_le) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (chapitre, q["enonce"], q["bonne"], json.dumps(q["mauvaises"], ensure_ascii=False), q["explication"],
+                     q["niveau"], statut, time.time()))
+                ajoutees += curseur.rowcount
+        return ajoutees
+
+    def questions_ia(self, chapitre=None, statut=None) -> list[dict]:
+        requete, valeurs = "SELECT * FROM questions_ia WHERE 1 = 1", []
+        if chapitre:
+            requete, valeurs = requete + " AND chapitre = ?", valeurs + [chapitre]
+        if statut:
+            requete, valeurs = requete + " AND statut = ?", valeurs + [statut]
+        return [{**dict(l), "mauvaises": json.loads(l["mauvaises"])} for l in self.db.execute(requete + " ORDER BY id", valeurs)]
+
+    def changer_statut_question(self, id_: int, statut: str) -> bool:
+        with self.verrou, self.db:
+            return self.db.execute("UPDATE questions_ia SET statut = ? WHERE id = ?", (statut, id_)).rowcount == 1
 
     # --- Devoirs en photo ------------------------------------------------
 

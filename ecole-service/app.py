@@ -43,6 +43,7 @@ from starlette.routing import Route
 import catalogue
 import exercices as E
 import lecons
+import quiz
 from stockage import Stockage
 import coran as Q
 import voix as V
@@ -230,11 +231,32 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None, coran=None) 
             return erreur("Chapitre inconnu.")
         niveau = stock.niveau(chapitre)
         liste = []
-        for ex in catalogue.serie(chapitre, niveau, 8, prenom=config.prenom):
+        for ex in avec_questions_ia(chapitre, catalogue.serie(chapitre, niveau, 8, prenom=config.prenom)):
             id_ = secrets.token_urlsafe(12)
             stock.enregistrer_exercice(id_, chapitre, niveau, ex)
             liste.append({"id": id_, **{k: ex.get(k) for k in CHAMPS_PUBLICS}})
         return JSONResponse({"chapitre": chapitre, "niveau": niveau, "exercices": liste})
+
+    def avec_questions_ia(chapitre, exercices: list[dict]) -> list[dict]:
+        """Remplace une partie de la série par des questions écrites par l'IA et validées par le parent."""
+        validees = stock.questions_ia(chapitre, "validee")
+        if not validees:
+            return exercices
+        rng = secrets.SystemRandom()
+        nombre = min(len(validees), max(2, len(exercices) // 2))
+        choisies = rng.sample(validees, nombre)
+        places = rng.sample(range(len(exercices)), min(nombre, len(exercices)))
+        for place, q in zip(places, choisies):
+            exercices[place] = quiz.question_vers_exercice(
+                (q["enonce"], q["bonne"], q["mauvaises"], q["explication"], q["niveau"]), False, rng)
+        return exercices
+
+    def enonces_connus(chapitre) -> set[str]:
+        """Les énoncés déjà posés dans ce chapitre (banque et questions de l'IA), pour éviter les doublons."""
+        rng = secrets.SystemRandom()
+        connus = {catalogue.generer(chapitre, n, rng, config.prenom)["enonce"] for _ in range(80) for n in (1, 2, 3)}
+        connus |= {q["enonce"] for q in stock.questions_ia(chapitre)}
+        return {" ".join(e.lower().split()) for e in connus}
 
     @protege()
     async def reponse(request: Request):
@@ -518,6 +540,64 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None, coran=None) 
                                        for n, progres in sorted(stock.coran_progres().items())
                                        for _, nom, total in [Q.PAR_NUMERO[n]]]})
 
+    # --- Nouvelles questions écrites par l'IA (parent) ------------------------------
+    # L'IA écrit à partir de la leçon seulement ; un second passage les vérifie ; le code
+    # contrôle leur forme ; le parent les valide avant que l'enfant les voie (sauf réglage).
+
+    def vue_question(q: dict) -> dict:
+        return {k: q[k] for k in ("id", "chapitre", "enonce", "bonne", "mauvaises", "explication", "niveau", "statut")} \
+            | {"titre": lecons.PAR_ID[q["chapitre"]]["titre"]}
+
+    @protege("parent")
+    async def generer_questions(request: Request):
+        donnees = await corps_json(request) or {}
+        chapitre = donnees.get("chapitre")
+        if chapitre not in chapitres_ouverts() or chapitre not in catalogue.CHAPITRES_QUESTIONS_IA:
+            return erreur("Ce chapitre ne prend pas de nouvelles questions.")
+        if not tuteur.actif:
+            return erreur("Les nouvelles questions ont besoin de la clé OpenAI du tuteur.", 503)
+        if not stock.compter_appel_ia(config.ia_par_jour):
+            return erreur("Le plafond d'appels à l'IA est atteint pour aujourd'hui.", 429)
+        lecon, infos = lecons.lecon_en_texte(chapitre), pour_tuteur(chapitre)
+        connus = enonces_connus(chapitre)
+        try:
+            brutes = await run_in_threadpool(tuteur.generer_questions, lecon, sorted(connus), **infos)
+            propres = [q for q in (catalogue.question_ia_valide(b, connus) for b in brutes) if q]
+            verdicts = await run_in_threadpool(tuteur.verifier_questions, lecon, propres, **infos) if propres else []
+        except TuteurIndisponible:
+            return erreur("L'IA ne répond pas. Réessaie dans un moment.", 502)
+        retenues = [q for q, ok in zip(propres, verdicts) if ok]
+        auto = stock.reglage("questions_auto", "non") == "oui"
+        ajoutees = stock.ajouter_questions_ia(chapitre, retenues, "validee" if auto else "a_valider")
+        return JSONResponse({"proposees": len(brutes), "retenues": ajoutees, "validation_auto": auto,
+                             "a_valider": [vue_question(q) for q in stock.questions_ia(chapitre, "a_valider")]})
+
+    @protege("parent")
+    async def questions_a_valider(request: Request):
+        ouverts = chapitres_ouverts()
+        return JSONResponse({
+            "a_valider": [vue_question(q) for q in stock.questions_ia(statut="a_valider") if q["chapitre"] in ouverts],
+            "validees": {c: len(stock.questions_ia(c, "validee")) for c in ouverts if c in catalogue.CHAPITRES_QUESTIONS_IA},
+            "validation_auto": stock.reglage("questions_auto", "non") == "oui",
+        })
+
+    @protege("parent")
+    async def statuer_question(request: Request):
+        donnees = await corps_json(request) or {}
+        ids, statut = donnees.get("ids"), donnees.get("statut")
+        if statut not in ("validee", "refusee") or not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
+            return erreur("Demande invalide.")
+        changees = sum(stock.changer_statut_question(i, statut) for i in ids[:200])
+        return JSONResponse({"changees": changees})
+
+    @protege("parent")
+    async def regler_validation(request: Request):
+        donnees = await corps_json(request) or {}
+        if not isinstance(donnees.get("auto"), bool):
+            return erreur("Demande invalide.")
+        stock.regler("questions_auto", "oui" if donnees["auto"] else "non")
+        return JSONResponse({"validation_auto": donnees["auto"]})
+
     @protege("parent")
     async def changer_voix(request: Request):
         donnees = await corps_json(request) or {}
@@ -561,6 +641,10 @@ def creer_app(config: Config | None = None, tuteur=None, voix=None, coran=None) 
         Route(f"{p}/explication", expliquer, methods=["POST"]),
         Route(f"{p}/ecoute", ecouter, methods=["POST"]),
         Route(f"{p}/reglage-voix", changer_voix, methods=["POST"]),
+        Route(f"{p}/questions-ia", questions_a_valider),
+        Route(f"{p}/questions-ia/generer", generer_questions, methods=["POST"]),
+        Route(f"{p}/questions-ia/statut", statuer_question, methods=["POST"]),
+        Route(f"{p}/questions-ia/reglage", regler_validation, methods=["POST"]),
         Route(f"{p}/devoirs", liste_devoirs),
         Route(f"{p}/devoirs", envoyer_devoir, methods=["POST"]),
         Route(f"{p}/devoirs/{{id}}/photo", photo_devoir),

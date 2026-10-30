@@ -203,6 +203,14 @@ select {
 .enonce-ligne { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
 .bulle .ecouter { display: block; margin-top: 6px; }
 
+/* Nouvelles questions (parent) */
+.questions-ia { display: grid; gap: 10px; margin-top: 10px; }
+.question-ia { background: var(--carte); border: 1.5px solid var(--bord); border-radius: 12px; padding: 10px 14px; display: grid; gap: 4px; }
+.question-ia .meta { font-size: .8rem; color: var(--doux); }
+.question-ia .bonne-reponse { color: var(--ok); font-weight: 700; }
+.question-ia .mauvaise-reponse { color: var(--faux); }
+.bouton.petit { font-size: .85rem; padding: 4px 10px; }
+
 /* Devoirs en photo */
 .devoirs { display: grid; gap: 14px; margin-top: 12px; }
 .devoir { background: var(--carte); border: 1.5px solid var(--bord); border-radius: var(--rayon); padding: 14px 16px; display: grid; gap: 10px; }

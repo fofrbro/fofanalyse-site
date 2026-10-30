@@ -157,6 +157,27 @@ Une maîtresse qui fait cours, et non un lecteur de texte.
 - Coût (tarifs OpenAI de 2025, à vérifier) : un cours complet coûte de
   l'ordre de quelques centimes la première fois, puis plus rien.
 
+## Nouvelles questions écrites par l'IA
+
+Les chapitres calculés (maths, conjugaison et accords, calculs d'argent,
+arabe) tirent de nouveaux exercices à chaque série. Les chapitres à questions
+fixes (sciences, histoire, géographie, anglais, EMC, grammaire, homophones et
+vocabulaire en français, notions d'argent) peuvent être enrichis :
+
+- dans « Suivi », le bouton « ➕ Nouvelles » d'un chapitre fait écrire par
+  l'IA des questions **à partir de la seule leçon** du chapitre, en lui
+  donnant les questions déjà posées pour éviter les doublons ;
+- le code contrôle leur forme (une seule bonne réponse, réponses toutes
+  différentes, pas de doublon), puis **une seconde lecture par l'IA** refuse
+  au moindre doute (réponse fausse ou absente de la leçon, ambiguïté, faute) ;
+- **le parent garde ou refuse** chaque question (ou « Tout garder ») ; une
+  case permet de valider automatiquement les questions vérifiées ;
+- les questions gardées remplacent jusqu'à la moitié de chaque série du
+  chapitre ; la progression n'est jamais effacée.
+
+Chaque génération compte deux appels dans `ECOLE_IA_PAR_JOUR`.
+`ECOLE_MODELE_DEVOIRS`, s'il est réglé, sert aussi ici.
+
 ## Devoirs en photo
 
 Onglet « 📷 Mon devoir » : l'enfant photographie l'énoncé d'un exercice.

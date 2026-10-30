@@ -64,14 +64,14 @@ async function api(route, donnees) {
   return resultat;
 }
 
-function afficher(vue) {
+function afficher(vue, defiler = true) {
   for (const v of document.querySelectorAll(".vue")) v.hidden = v.id !== `vue-${vue}`;
   $("chargement").hidden = true;
   const connecte = vue !== "connexion";
   $("sortir").hidden = !connecte;
   $("etoiles-total").hidden = !connecte;
   $("lien-suivi").hidden = etat.role !== "parent";
-  window.scrollTo(0, 0);
+  if (defiler) window.scrollTo(0, 0);
 }
 
 function pointsNiveau(niveau) {
@@ -668,8 +668,9 @@ function pastille(p) {
   return el("span", `pastille ${p >= 70 ? "bien" : p < 50 ? "attention" : "neutre"}`, `${p} %`);
 }
 
-async function afficherSuivi() {
-  const s = await api("/suivi");
+async function afficherSuivi(defiler = true) {
+  const [s, q] = await Promise.all([api("/suivi"), api("/questions-ia")]);
+  dessinerQuestionsAValider(q);
   const titres = Object.fromEntries(etat.chapitres.map((c) => [c.id, titreChapitre(c)]));
   const classeDe = Object.fromEntries(etat.chapitres.map((c) => [c.id, c.classe]));
   // La classe en cours, plus les chapitres d'avant qui ont été révisés.
@@ -720,6 +721,16 @@ async function afficherSuivi() {
     ];
     cellules[3].append(pastille(pourcent(c.reussis, c.faits)));
     cellules[5].append(c.derniers_rates.length ? rates : document.createTextNode("—"));
+    const cellule = el("td");
+    if (c.chapitre in q.validees) {
+      const b = el("button", "bouton secondaire petit", "➕ Nouvelles");
+      b.type = "button";
+      b.title = "Faire écrire de nouvelles questions par l'IA";
+      b.addEventListener("click", () => nouvellesQuestions(c.chapitre, b));
+      cellule.append(b);
+      if (q.validees[c.chapitre]) cellule.append(el("span", "meta", ` +${q.validees[c.chapitre]}`));
+    }
+    cellules.push(cellule);
     tr.append(...cellules);
     return tr;
   }));
@@ -750,7 +761,7 @@ async function afficherSuivi() {
     return li;
   }));
   if (!s.questions.length) liste.append(el("li", null, "Aucune question pour l'instant."));
-  afficher("suivi");
+  afficher("suivi", defiler);
 }
 
 $("form-classe").addEventListener("submit", async (e) => {
@@ -796,6 +807,67 @@ $("garder-voix").addEventListener("click", async () => {
     $("message-voix").className = "message";
     $("message-voix").textContent = err.message;
   }
+});
+
+// --- Nouvelles questions écrites par l'IA (parent) -------------------------------------
+
+function dessinerQuestionsAValider(q) {
+  $("questions-auto").checked = q.validation_auto;
+  $("actions-questions").hidden = !q.a_valider.length;
+  $("tout-garder").dataset.ids = JSON.stringify(q.a_valider.map((x) => x.id));
+  $("questions-a-valider").replaceChildren(...q.a_valider.map((x) => {
+    const carte = el("div", "question-ia");
+    carte.append(el("span", "meta", `${x.titre} · niveau ${x.niveau}`), el("strong", null, x.enonce),
+                 el("span", "bonne-reponse", `✓ ${x.bonne}`), el("span", "mauvaise-reponse", `✗ ${x.mauvaises.join(" · ✗ ")}`),
+                 el("span", "meta", x.explication));
+    const actions = el("div", "ligne");
+    for (const [libelle, statut, classe] of [["Garder", "validee", "bouton petit"], ["Refuser", "refusee", "bouton danger petit"]]) {
+      const b = el("button", classe, libelle);
+      b.type = "button";
+      b.addEventListener("click", async () => {
+        await api("/questions-ia/statut", { ids: [x.id], statut });
+        await afficherSuivi(false);
+      });
+      actions.append(b);
+    }
+    carte.append(actions);
+    return carte;
+  }));
+  if (!q.a_valider.length && !$("message-questions").textContent) {
+    $("questions-a-valider").append(el("p", "aide", "Aucune question en attente."));
+  }
+}
+
+async function nouvellesQuestions(chapitre, bouton) {
+  const message = $("message-questions");
+  bouton.disabled = true;
+  message.className = "message ok";
+  message.textContent = "L'IA écrit et relit de nouvelles questions… (une trentaine de secondes)";
+  try {
+    const r = await api("/questions-ia/generer", { chapitre });
+    message.textContent = r.retenues
+      ? `${r.retenues} question${r.retenues > 1 ? "s" : ""} retenue${r.retenues > 1 ? "s" : ""} sur ${r.proposees} proposée${r.proposees > 1 ? "s" : ""}`
+        + (r.validation_auto ? " : elles sont déjà dans les séries." : " : à vérifier ci-dessous.")
+      : "Aucune nouvelle question fiable cette fois-ci (doublons ou doutes). Réessayez plus tard.";
+    await afficherSuivi(false);
+    $("message-questions").scrollIntoView({ block: "center", behavior: "smooth" });
+  } catch (err) {
+    message.className = "message";
+    message.textContent = err.message;
+  } finally {
+    bouton.disabled = false;
+  }
+}
+
+$("tout-garder").addEventListener("click", async (e) => {
+  await api("/questions-ia/statut", { ids: JSON.parse(e.currentTarget.dataset.ids || "[]"), statut: "validee" });
+  $("message-questions").className = "message ok";
+  $("message-questions").textContent = "Toutes les questions sont gardées : elles apparaîtront dans les séries.";
+  await afficherSuivi(false);
+});
+
+$("questions-auto").addEventListener("change", async (e) => {
+  await api("/questions-ia/reglage", { auto: e.target.checked });
 });
 
 let confirmer = false;

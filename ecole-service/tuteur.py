@@ -190,6 +190,54 @@ class Tuteur:
         return {"lisible": bool(donnees.get("lisible")),
                 **{k: str(donnees.get(k) or "").strip()[:6000] for k in ("matiere", "enonce", "explication", "solution")}}
 
+    def _json(self, consigne: str, classe, age, matiere, longueur=2500) -> dict:
+        r = self._post(URL_CHAT, {
+            "model": self.modele_devoirs,
+            "messages": [{"role": "system", "content": consignes(self.prenom, classe, age, matiere)},
+                         {"role": "user", "content": consigne}],
+            "response_format": {"type": "json_object"},
+            "max_completion_tokens": longueur,
+            "temperature": 0.3,
+        }, delai=90)
+        try:
+            return json.loads(r["choices"][0]["message"]["content"])
+        except (KeyError, IndexError, TypeError, ValueError) as e:
+            raise TuteurIndisponible("réponse inattendue") from e
+
+    def generer_questions(self, lecon: str, existantes: list[str], classe="CM1", age=9,
+                          matiere="Mathématiques", nombre=8) -> list[dict]:
+        """De nouvelles questions à choix, écrites uniquement à partir de la leçon."""
+        deja = "\n".join(f"- {e}" for e in existantes[:60]) or "(aucune)"
+        consigne = (
+            f"{lecon}\n\nÉcris {nombre} nouvelles questions à choix multiple sur cette leçon, pour {self.prenom} "
+            f"({classe}, {age} ans). Règles strictes :\n"
+            "- utilise UNIQUEMENT ce qui est dans la leçon ci-dessus : aucun fait, aucune date, aucun nombre extérieur ;\n"
+            "- une seule bonne réponse, sans ambiguïté ; 2 ou 3 mauvaises réponses plausibles mais clairement fausses ;\n"
+            "- français correct, accents compris, vocabulaire de son âge ; pas de « toutes les réponses » ni de piège ;\n"
+            "- niveau 1 : retenir ; niveau 2 : comprendre ; niveau 3 : appliquer à un cas nouveau ; mélange les trois ;\n"
+            "- ne reprends pas ces questions déjà posées :\n" + deja + "\n"
+            'Réponds en JSON : {"questions": [{"enonce": "…", "bonne": "…", "mauvaises": ["…", "…"], '
+            '"explication": "une phrase qui justifie la bonne réponse par la leçon", "niveau": 1}]}. '
+            "S'il n'y a pas assez de matière dans la leçon, écris-en moins."
+        )
+        questions = self._json(consigne, classe, age, matiere).get("questions", [])
+        return questions if isinstance(questions, list) else []
+
+    def verifier_questions(self, lecon: str, questions: list[dict], classe="CM1", age=9,
+                           matiere="Mathématiques") -> list[bool]:
+        """Second passage : chaque question est-elle juste, conforme à la leçon et sans ambiguïté ?"""
+        liste = json.dumps([{k: q.get(k) for k in ("enonce", "bonne", "mauvaises")} for q in questions], ensure_ascii=False)
+        consigne = (
+            f"{lecon}\n\nTu es un relecteur exigeant. Pour chacune de ces questions, vérifie que : la bonne réponse est "
+            "vraiment juste et se trouve dans la leçon ; aucune mauvaise réponse n'est juste elle aussi ; la question est "
+            f"claire, sans ambiguïté, adaptée à un enfant de {age} ans, et écrite sans faute. Au moindre doute, refuse.\n"
+            f"Questions : {liste}\n"
+            'Réponds en JSON : {"verdicts": [{"index": 0, "ok": true, "raison": "…"}]}, un verdict par question, dans l\'ordre.'
+        )
+        verdicts = self._json(consigne, classe, age, matiere, longueur=1500).get("verdicts", [])
+        accepte = {v.get("index"): bool(v.get("ok")) for v in verdicts if isinstance(v, dict)}
+        return [accepte.get(i, False) for i in range(len(questions))]
+
     def reexpliquer(self, lecon: str, ex: dict, reponse_eleve, classe="CM1", age=9,
                     matiere="Mathématiques") -> str:
         if isinstance(reponse_eleve, list):
