@@ -134,6 +134,22 @@ class FauxTuteur:
         return {"lisible": True, "matiere": "Mathématiques", "enonce": "Combien font 7 × 8 ?",
                 "explication": "On te demande un produit. Pense à la table de 7.", "solution": "7 × 8 = 56."}
 
+    def generer_questions(self, lecon, existantes, classe, age, matiere, nombre=8):
+        self.appels.append(("generer", existantes))
+        return [
+            {"enonce": "Quel chef gaulois a affronté César à Gergovie ?", "bonne": "Vercingétorix",
+             "mauvaises": ["Clovis", "Charlemagne"], "explication": "La leçon le dit.", "niveau": 2},
+            {"enonce": "Question refusée par le relecteur ?", "bonne": "A", "mauvaises": ["B", "C"],
+             "explication": "…", "niveau": 1},
+            {"enonce": "Question mal formée, la bonne réponse est aussi une mauvaise ?", "bonne": "Oui",
+             "mauvaises": ["Oui", "Non"], "explication": "…", "niveau": 1},
+            {"enonce": "Quel chef gaulois a mené la résistance contre Jules César ?", "bonne": "Vercingétorix",
+             "mauvaises": ["Clovis", "Charlemagne"], "explication": "Doublon de la banque.", "niveau": 1},
+        ]
+
+    def verifier_questions(self, lecon, questions, classe, age, matiere):
+        return ["refusée" not in q["enonce"] for q in questions]
+
     def expliquer_lecon(self, lecon, classe, age, matiere):
         self.appels.append(("expliquer", lecon))
         return "Bonjour ! Aujourd'hui, on parle des fractions.\n\nUn quart, c'est une part sur quatre.\n\nÀ toi de jouer !"
@@ -728,3 +744,44 @@ def test_devoir_illisible_ou_sans_tuteur(client):
     assert client.post("/api/ecole/devoirs", content=illisible, headers={"content-type": "image/jpeg"}).status_code == 422
     client.tuteur.actif = False
     assert client.post("/api/ecole/devoirs", content=JPEG, headers={"content-type": "image/jpeg"}).status_code == 503
+
+
+# --- Nouvelles questions écrites par l'IA, validées par le parent -------------------------------------
+
+def test_nouvelles_questions_verifiees_puis_validees(client):
+    se_connecter(client)
+    assert client.post("/api/ecole/questions-ia/generer", json={"chapitre": "hist-cm1-gaule"}).status_code == 403
+    se_connecter(client, "papa-2026")
+    assert client.post("/api/ecole/questions-ia/generer", json={"chapitre": "tables"}).status_code == 400  # chapitre calculé
+    r = client.post("/api/ecole/questions-ia/generer", json={"chapitre": "hist-cm1-gaule"}).json()
+    # 4 proposées : 1 refusée par le relecteur, 1 mal formée, 1 doublon de la banque → 1 retenue, à valider
+    assert r["proposees"] == 4 and r["retenues"] == 1 and r["validation_auto"] is False
+    question = r["a_valider"][0]
+    assert question["statut"] == "a_valider" and question["titre"] == "Et avant la France ?"
+    assert "Quel chef gaulois a mené la résistance contre Jules César ?" in client.tuteur.appels[-1][1][0] or \
+        any("jules césar" in e for e in client.tuteur.appels[-1][1])  # la banque est donnée à l'IA
+
+    # Tant qu'elle n'est pas validée, l'enfant ne la voit pas
+    se_connecter(client)
+    enonces = {e["enonce"] for _ in range(5)
+               for e in client.post("/api/ecole/serie", json={"chapitre": "hist-cm1-gaule"}).json()["exercices"]}
+    assert question["enonce"] not in enonces
+
+    se_connecter(client, "papa-2026")
+    assert client.post("/api/ecole/questions-ia/statut", json={"ids": [question["id"]], "statut": "validee"}).json() == {"changees": 1}
+    assert client.get("/api/ecole/questions-ia").json()["validees"]["hist-cm1-gaule"] == 1
+    se_connecter(client)
+    serie = client.post("/api/ecole/serie", json={"chapitre": "hist-cm1-gaule"}).json()["exercices"]
+    assert question["enonce"] in {e["enonce"] for e in serie}  # mélangée à la série
+    # Une seconde génération ne recrée pas la même question
+    se_connecter(client, "papa-2026")
+    assert client.post("/api/ecole/questions-ia/generer", json={"chapitre": "hist-cm1-gaule"}).json()["retenues"] == 0
+
+
+def test_validation_automatique(client):
+    se_connecter(client, "papa-2026")
+    assert client.post("/api/ecole/questions-ia/reglage", json={"auto": True}).json() == {"validation_auto": True}
+    r = client.post("/api/ecole/questions-ia/generer", json={"chapitre": "arg-banque"}).json()
+    # Ici, la question sur Vercingétorix n'est pas un doublon (autre chapitre) : 2 retenues, validées d'office
+    assert r["retenues"] == 2 and r["a_valider"] == []
+    assert client.get("/api/ecole/questions-ia").json()["validees"]["arg-banque"] == 2
