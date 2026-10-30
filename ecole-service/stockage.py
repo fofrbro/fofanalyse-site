@@ -158,20 +158,23 @@ class Stockage:
         return ligne["niveau"] if ligne else 1
 
     def ajuster_niveau(self, chapitre) -> int | None:
-        """Monte d'un niveau après 6 exercices au moins, réussis à 85 % du premier coup ;
-        descend après 4 exercices au moins, réussis à 40 % ou moins.
+        """Change de niveau d'après les derniers exercices du niveau en cours (fenêtre glissante) :
+        monte si les 6 derniers sont justes du premier coup, ou au moins 7 des 8 derniers ;
+        descend si 3 ou moins des 6 derniers sont justes du premier coup.
+        Une erreur ancienne ne bloque donc plus : seuls les progrès récents comptent.
         Renvoie le nouveau niveau s'il a changé."""
         with self.verrou, self.db:
             ligne = self.db.execute("SELECT niveau, depuis FROM niveaux WHERE chapitre = ?", (chapitre,)).fetchone()
             niveau, depuis = (ligne["niveau"], ligne["depuis"]) if ligne else (1, 0)
-            stats = self.db.execute(
-                "SELECT COUNT(*) n, COALESCE(SUM(reussi_premier), 0) ok FROM exercices "
-                "WHERE chapitre = ? AND termine = 1 AND termine_le > ?", (chapitre, depuis)).fetchone()
-            n, ok = stats["n"], stats["ok"]
+            derniers = [r["reussi_premier"] or 0 for r in self.db.execute(
+                "SELECT reussi_premier FROM exercices WHERE chapitre = ? AND termine = 1 AND termine_le > ? "
+                "ORDER BY termine_le DESC, rowid DESC LIMIT 8", (chapitre, depuis))]
             nouveau = niveau
-            if n >= 6 and ok / n >= 0.85 and niveau < 3:
+            monte = (len(derniers) >= 6 and sum(derniers[:6]) == 6) or (len(derniers) == 8 and sum(derniers) >= 7)
+            descend = len(derniers) >= 6 and sum(derniers[:6]) <= 3
+            if monte and niveau < 3:
                 nouveau = niveau + 1
-            elif n >= 4 and ok / n <= 0.40 and niveau > 1:
+            elif descend and niveau > 1:
                 nouveau = niveau - 1
             if nouveau != niveau or not ligne:
                 self.db.execute("INSERT INTO niveaux (chapitre, niveau, depuis) VALUES (?, ?, ?) "

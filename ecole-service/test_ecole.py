@@ -785,3 +785,42 @@ def test_validation_automatique(client):
     # Ici, la question sur Vercingétorix n'est pas un doublon (autre chapitre) : 2 retenues, validées d'office
     assert r["retenues"] == 2 and r["a_valider"] == []
     assert client.get("/api/ecole/questions-ia").json()["validees"]["arg-banque"] == 2
+
+
+# --- Changement de niveau : fenêtre glissante ----------------------------------------------------------
+
+def faire(stock, chapitre, resultats):
+    """Enregistre une suite d'exercices terminés (True : juste du premier coup) ; renvoie les changements de niveau."""
+    import itertools
+    changements = []
+    for juste, n in zip(resultats, itertools.count()):
+        id_ = f"{chapitre}-{n}-{random.random()}"
+        stock.enregistrer_exercice(id_, chapitre, stock.niveau(chapitre), {"enonce": "…"})
+        for _ in range(1 if juste else 3):
+            stock.noter_essai(id_, juste, "x")
+        changements.append(stock.ajuster_niveau(chapitre))
+    return changements
+
+
+def test_niveau_monte_sur_les_progres_recents(tmp_path):
+    from stockage import Stockage
+    stock = Stockage(str(tmp_path / "n.db"))
+    # Sans erreur : niveau 2 au 6e exercice, niveau 3 six exercices plus tard (12 au total)
+    changements = faire(stock, "nombres", [True] * 12)
+    assert changements[5] == 2 and changements[11] == 3 and stock.niveau("nombres") == 3
+    # 3 erreurs au début, puis tout juste : niveau 2 au 9e exercice (6 justes d'affilée),
+    # au lieu de 20 exercices avec l'ancienne règle
+    changements = faire(stock, "fractions", [False] * 3 + [True] * 6)
+    assert changements[-1] == 2 and all(c is None for c in changements[:-1])
+    # 7 justes sur les 8 derniers suffisent aussi
+    changements = faire(stock, "decimaux", [True, True, True, False, True, True, True, True])
+    assert changements[-1] == 2
+
+
+def test_niveau_descend_si_trop_d_erreurs_recentes(tmp_path):
+    from stockage import Stockage
+    stock = Stockage(str(tmp_path / "n.db"))
+    faire(stock, "division", [True] * 6)
+    assert stock.niveau("division") == 2
+    changements = faire(stock, "division", [True, True, False, False, False, False])
+    assert changements[-1] == 1 and stock.niveau("division") == 1

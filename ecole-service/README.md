@@ -115,9 +115,12 @@ redéployer). `ECOLE_CLASSE` ne sert qu'au tout premier démarrage. Les
 chapitres des classes d'avant restent ouverts, repliés sous « Réviser » sur
 l'accueil, avec leurs niveaux et leurs étoiles.
 
-Chaque chapitre a 3 niveaux. Il monte d'un niveau après au moins 6 exercices
-réussis à 85 % du premier coup, et redescend après au moins 4 exercices
-réussis à 40 % ou moins.
+Chaque chapitre a 3 niveaux. Seuls les derniers exercices du niveau en cours
+comptent (fenêtre glissante) : on monte quand les 6 derniers sont justes du
+premier coup, ou au moins 7 des 8 derniers ; on redescend quand 3 ou moins
+des 6 derniers sont justes du premier coup. Le compte repart de zéro à chaque
+changement de niveau. Il faut donc au moins 6 exercices par niveau (12 pour
+atteindre le niveau 3), et une erreur ancienne ne bloque plus la progression.
 
 ## Accès
 
