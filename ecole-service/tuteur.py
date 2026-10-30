@@ -89,9 +89,10 @@ def noter_erreur(service: str, e: Exception) -> str:
 
 
 class Tuteur:
-    def __init__(self, cle: str | None, modele: str, prenom: str):
+    def __init__(self, cle: str | None, modele: str, prenom: str, modele_devoirs: str | None = None):
         self.cle = cle
         self.modele = modele
+        self.modele_devoirs = modele_devoirs or modele
         self.prenom = prenom
 
     @property
@@ -108,11 +109,12 @@ class Tuteur:
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
             raise TuteurIndisponible(noter_erreur(url.rsplit("/", 1)[-1], e)) from e
 
-    def message_autorise(self, texte: str) -> bool:
-        """Filtre de modération d'OpenAI (gratuit). En cas de panne, on laisse passer :
-        les consignes du tuteur restent le second garde-fou."""
+    def message_autorise(self, texte: str = "", image: str | None = None) -> bool:
+        """Filtre de modération d'OpenAI (gratuit), sur un texte ou une image (adresse data:).
+        En cas de panne, on laisse passer : les consignes du tuteur restent le second garde-fou."""
+        entree = [{"type": "image_url", "image_url": {"url": image}}] if image else texte
         try:
-            r = self._post(URL_MODERATION, {"model": "omni-moderation-latest", "input": texte}, delai=10)
+            r = self._post(URL_MODERATION, {"model": "omni-moderation-latest", "input": entree}, delai=10)
             return not r["results"][0]["flagged"]
         except (TuteurIndisponible, KeyError, IndexError):
             return True
@@ -156,6 +158,38 @@ class Tuteur:
         )
         return self._discuter([{"role": "user", "content": consigne}], classe, age, matiere, longueur=900)
 
+    def analyser_devoir(self, image: str, classe="CM1", age=9) -> dict:
+        """Lit la photo d'un énoncé. Renvoie l'explication pour l'enfant (sans la réponse)
+        et la solution complète pour le parent. image : adresse data:image/jpeg;base64,…"""
+        consigne = (
+            f"Voici la photo d'un exercice de {self.prenom}, élève de {classe}. Réponds uniquement en JSON, avec ces clés :\n"
+            '- "lisible" : true si la photo montre un exercice scolaire lisible, sinon false ;\n'
+            '- "matiere" : la matière (Mathématiques, Français, Sciences, Histoire, Géographie, Anglais…) ;\n'
+            '- "enonce" : l\'énoncé recopié fidèlement, mot pour mot ;\n'
+            f'- "explication" : pour {self.prenom}, en le tutoyant, à dire à voix haute (phrases courtes, sans symboles, '
+            "les calculs en toutes lettres) : ce qu'on lui demande avec des mots simples, la leçon ou la règle qui sert, "
+            "la méthode étape par étape et un indice pour démarrer. NE DONNE PAS la réponse finale ni le résultat des "
+            "calculs : il doit trouver seul. 150 mots au plus ;\n"
+            '- "solution" : pour le parent, la solution complète et rédigée, étape par étape, avec tous les calculs '
+            "vérifiés et la réponse finale clairement indiquée ; signale toute ambiguïté de l'énoncé.\n"
+            "Si la photo n'est pas un exercice scolaire, mets lisible à false et laisse les autres textes vides."
+        )
+        r = self._post(URL_CHAT, {
+            "model": self.modele_devoirs,
+            "messages": [{"role": "system", "content": consignes(self.prenom, classe, age, "toutes les matières")},
+                         {"role": "user", "content": [{"type": "text", "text": consigne},
+                                                      {"type": "image_url", "image_url": {"url": image, "detail": "high"}}]}],
+            "response_format": {"type": "json_object"},
+            "max_completion_tokens": 1500,
+            "temperature": 0.2,
+        }, delai=90)
+        try:
+            donnees = json.loads(r["choices"][0]["message"]["content"])
+        except (KeyError, IndexError, TypeError, ValueError) as e:
+            raise TuteurIndisponible("réponse inattendue") from e
+        return {"lisible": bool(donnees.get("lisible")),
+                **{k: str(donnees.get(k) or "").strip()[:6000] for k in ("matiere", "enonce", "explication", "solution")}}
+
     def reexpliquer(self, lecon: str, ex: dict, reponse_eleve, classe="CM1", age=9,
                     matiere="Mathématiques") -> str:
         if isinstance(reponse_eleve, list):
@@ -178,4 +212,5 @@ def depuis_environnement() -> Tuteur:
         cle=os.environ.get("ECOLE_OPENAI_API_KEY") or None,
         modele=os.environ.get("ECOLE_OPENAI_MODEL", "gpt-4o-mini"),
         prenom=os.environ.get("ECOLE_PRENOM", "Mouaz"),
+        modele_devoirs=os.environ.get("ECOLE_MODELE_DEVOIRS") or None,
     )

@@ -132,6 +132,8 @@ ECOLE_IA_PAR_JOUR=60
 # Maîtresse virtuelle (voix d'OpenAI, même clé que le tuteur) ; les audios déjà écoutés sont gratuits
 ECOLE_VOIX=coral   # voix de départ ; le parent la change ensuite dans « Suivi »
 ECOLE_VOIX_PAR_JOUR=200
+# Devoirs en photo (facultatif) : un modèle plus fort pour lire et résoudre les exercices
+# ECOLE_MODELE_DEVOIRS=gpt-4o
 ```
 
 Le secret de session se génère sur le serveur avec `openssl rand -hex 32`.

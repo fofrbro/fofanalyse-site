@@ -58,6 +58,16 @@ CREATE TABLE IF NOT EXISTS explications (
     PRIMARY KEY (chapitre, classe)
 );
 
+CREATE TABLE IF NOT EXISTS devoirs (
+    id TEXT PRIMARY KEY,
+    cree_le REAL NOT NULL,
+    matiere TEXT NOT NULL,
+    enonce TEXT NOT NULL,
+    explication TEXT NOT NULL,
+    solution TEXT NOT NULL,
+    solution_visible INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS reglages (
     cle TEXT PRIMARY KEY,
     valeur TEXT NOT NULL
@@ -196,6 +206,30 @@ class Stockage:
         with self.verrou, self.db:
             self.db.execute("INSERT OR REPLACE INTO explications (chapitre, classe, texte, cree_le) VALUES (?, ?, ?, ?)",
                             (chapitre, classe, texte, time.time()))
+
+    # --- Devoirs en photo ------------------------------------------------
+
+    def ajouter_devoir(self, id_, analyse: dict):
+        with self.verrou, self.db:
+            self.db.execute("INSERT INTO devoirs (id, cree_le, matiere, enonce, explication, solution) "
+                            "VALUES (?, ?, ?, ?, ?, ?)", (id_, time.time(), analyse["matiere"], analyse["enonce"],
+                                                          analyse["explication"], analyse["solution"]))
+
+    def devoirs(self, limite=50) -> list[dict]:
+        return [dict(l) for l in self.db.execute("SELECT * FROM devoirs ORDER BY cree_le DESC LIMIT ?", (limite,))]
+
+    def devoir(self, id_) -> dict | None:
+        ligne = self.db.execute("SELECT * FROM devoirs WHERE id = ?", (id_,)).fetchone()
+        return dict(ligne) if ligne else None
+
+    def montrer_solution(self, id_, visible: bool) -> bool:
+        with self.verrou, self.db:
+            return self.db.execute("UPDATE devoirs SET solution_visible = ? WHERE id = ?",
+                                   (1 if visible else 0, id_)).rowcount == 1
+
+    def effacer_devoir(self, id_) -> bool:
+        with self.verrou, self.db:
+            return self.db.execute("DELETE FROM devoirs WHERE id = ?", (id_,)).rowcount == 1
 
     # --- Coran ------------------------------------------------------------
 

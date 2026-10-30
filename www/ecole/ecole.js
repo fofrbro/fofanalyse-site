@@ -335,6 +335,8 @@ function afficherAccueil() {
   }
   const ongletCoran = el("a", "onglet", "Coran");
   ongletCoran.href = "#coran";
+  const ongletDevoirs = el("a", "onglet", "📷 Mon devoir");
+  ongletDevoirs.href = "#devoirs";
   $("onglets").replaceChildren(...Object.entries(etat.matieres).map(([id, nom]) => {
     const b = el("button", "onglet", nom);
     b.type = "button";
@@ -342,7 +344,7 @@ function afficherAccueil() {
     b.setAttribute("aria-selected", String(id === etat.matiere));
     b.addEventListener("click", () => { etat.matiere = id; ecrireMemoire("matiere", id); afficherAccueil(); });
     return b;
-  }), ongletCoran);
+  }), ongletCoran, ongletDevoirs);
   const deLaMatiere = etat.chapitres.filter((c) => c.matiere === etat.matiere);
   const actuels = deLaMatiere.filter((c) => c.classe === etat.classe);
   const zone = $("domaines");
@@ -1038,6 +1040,95 @@ $("quiz-coran-lancer").addEventListener("click", () => {
   zone.replaceChildren(consigne, debut, liste);
 });
 
+// --- Devoirs en photo ----------------------------------------------------------------
+// La photo est réduite ici (1 600 px au plus, JPEG) avant l'envoi. Le serveur ne renvoie la
+// solution à l'enfant que si le parent l'a débloquée.
+
+async function reduirePhoto(fichier) {
+  const image = await createImageBitmap(fichier);
+  const echelle = Math.min(1, 1600 / Math.max(image.width, image.height));
+  const toile = document.createElement("canvas");
+  toile.width = Math.round(image.width * echelle);
+  toile.height = Math.round(image.height * echelle);
+  toile.getContext("2d").drawImage(image, 0, 0, toile.width, toile.height);
+  return new Promise((ok) => toile.toBlob(ok, "image/jpeg", 0.85));
+}
+
+function carteDevoir(d) {
+  const carte = el("article", "devoir");
+  const date = new Date(d.cree_le * 1000).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
+  const entete = el("div", "devoir-entete");
+  entete.append(el("span", null, d.matiere || "Exercice"), el("span", null, date));
+  const photo = el("img", "devoir-photo");
+  photo.src = `${API}/devoirs/${d.id}/photo`;
+  photo.alt = "Photo de l'exercice";
+  photo.loading = "lazy";
+  carte.append(entete, photo, el("h3", null, "L'énoncé"), el("p", null, d.enonce));
+
+  const titreExplication = el("h3", null, "Comment t'y prendre ");
+  titreExplication.append(boutonEcouter(d.explication, "🔊 La maîtresse t'explique"));
+  carte.append(titreExplication, el("p", "explication", d.explication));
+
+  if (etat.role === "parent") {
+    carte.append(el("h3", null, "La solution (pour toi) — proposée par l'IA, à vérifier"), el("p", "solution", d.solution));
+    const actions = el("div", "ligne");
+    const basculer = el("button", "bouton secondaire",
+      d.solution_visible ? `🔒 Cacher la solution à ${etat.prenom}` : `🔓 Autoriser ${etat.prenom} à voir la solution`);
+    basculer.type = "button";
+    basculer.addEventListener("click", async () => {
+      const r = await api(`/devoirs/${d.id}/solution`, { visible: !d.solution_visible });
+      carte.replaceWith(carteDevoir(r));
+    });
+    const effacer = el("button", "bouton danger", "Effacer");
+    effacer.type = "button";
+    effacer.addEventListener("click", async () => {
+      if (!effacer.dataset.sur) { effacer.dataset.sur = "1"; effacer.textContent = "Sûr ? Cliquer encore"; return; }
+      await api(`/devoirs/${d.id}/effacer`, {});
+      carte.remove();
+    });
+    actions.append(basculer, effacer);
+    carte.append(actions);
+  } else if (d.solution) {
+    carte.append(el("h3", null, "La solution (débloquée par ton parent)"), el("p", "solution", d.solution));
+  } else {
+    carte.append(el("p", "verrou", "🔒 La solution est réservée à ton parent. Essaie d'abord tout seul ! "
+      + "Si tu bloques vraiment, demande-lui de la débloquer."));
+  }
+  return carte;
+}
+
+async function afficherDevoirs() {
+  afficher("devoirs");
+  $("devoirs-intro").textContent = etat.role === "parent"
+    ? `Les exercices photographiés par ${etat.prenom}. Toi seul vois la solution ; tu peux la débloquer pour lui.`
+    : "Photographie l'énoncé de ton exercice : ta maîtresse t'explique comment t'y prendre. La solution, elle, est réservée à ton parent.";
+  const r = await api("/devoirs");
+  $("liste-devoirs").replaceChildren(...r.devoirs.map(carteDevoir));
+}
+
+$("photo-devoir").addEventListener("change", async (e) => {
+  const fichier = e.target.files[0];
+  e.target.value = "";
+  if (!fichier) return;
+  const message = $("devoir-message");
+  message.className = "message ok";
+  message.textContent = "Je regarde ton exercice… (quelques secondes)";
+  try {
+    const photo = await reduirePhoto(fichier);
+    const reponse = await fetch(`${API}/devoirs`, { method: "POST", credentials: "same-origin",
+                                                  headers: { "Content-Type": "image/jpeg" }, body: photo });
+    const d = await reponse.json().catch(() => ({}));
+    if (!reponse.ok) throw new Error(d.erreur || `Erreur ${reponse.status}`);
+    message.textContent = "";
+    const carte = carteDevoir(d);
+    $("liste-devoirs").prepend(carte);
+    carte.querySelector(".ecouter")?.click();  // la maîtresse explique tout de suite
+  } catch (err) {
+    message.className = "message";
+    message.textContent = err.message;
+  }
+});
+
 // --- Navigation (#accueil, #fractions, #suivi…) -------------------------------
 
 async function router() {
@@ -1048,6 +1139,7 @@ async function router() {
     if (cible !== "coran" && !cible.startsWith("coran-")) arreterCoran();
     if (chapitre) afficherChapitre(chapitre);
     else if (cible === "coran") await afficherCoran();
+    else if (cible === "devoirs") await afficherDevoirs();
     else if (/^coran-\d+$/.test(cible)) await afficherSourate(Number(cible.slice(6)));
     else if (cible === "suivi" && etat.role === "parent") await afficherSuivi();
     else { await chargerProgramme(); afficherAccueil(); }

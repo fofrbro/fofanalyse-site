@@ -157,6 +157,27 @@ Une maîtresse qui fait cours, et non un lecteur de texte.
 - Coût (tarifs OpenAI de 2025, à vérifier) : un cours complet coûte de
   l'ordre de quelques centimes la première fois, puis plus rien.
 
+## Devoirs en photo
+
+Onglet « 📷 Mon devoir » : l'enfant photographie l'énoncé d'un exercice.
+
+- La page réduit la photo (1 600 px au plus, JPEG) avant l'envoi ; le
+  serveur vérifie que c'est bien une image, la passe au filtre de
+  modération (qui accepte aussi les images), puis la confie au modèle de
+  vision d'OpenAI.
+- L'IA renvoie l'énoncé recopié, une **explication pour l'enfant** (ce qu'on
+  lui demande, la règle utile, la méthode, un indice, **sans la réponse**),
+  que la maîtresse lui dit à voix haute, et une **solution complète pour le
+  parent**.
+- La solution n'est jamais envoyée à la session de l'enfant tant que le
+  parent ne l'a pas débloquée (bouton « Autoriser … à voir la solution »,
+  réversible). Le parent peut aussi effacer un devoir et sa photo.
+- La solution est proposée par l'IA : à vérifier, surtout pour les calculs.
+  `ECOLE_MODELE_DEVOIRS` permet d'utiliser un modèle plus fort pour cette
+  partie seulement (par exemple `gpt-4o`), plus cher mais plus fiable.
+- Photos dans `/data/devoirs`, devoirs dans la table `devoirs`. Chaque photo
+  compte comme un appel dans `ECOLE_IA_PAR_JOUR`.
+
 ## Garde-fous du tuteur
 
 - Consignes strictes : français simple, 120 mots au plus, méthode de l'école
